@@ -1,7 +1,10 @@
 {
-    "website_url": "https://example.com/this-page-does-not-exist",
+    "website_url": "http://127.0.0.1:5000",
     "browser": "chromium",
     "headless": false,
     "timeout": 30000,
-    "screenshot": true
+    "screenshot": true,
+    "max_pages": 10,
+    "test_links": true,
+    "test_buttons": true
 }

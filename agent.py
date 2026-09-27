@@ -9,66 +9,163 @@ def main():
 
     tester = BrowserTester()
 
-    results = tester.test_website()
+    results = tester.crawl_website()
+
+    total_pages = len(results)
+
+    passed_pages = sum(
+        1
+        for result in results
+        if result["status"] == "PASSED"
+    )
+
+    failed_pages = sum(
+        1
+        for result in results
+        if result["status"] == "FAILED"
+    )
+
+    total_links = sum(
+        result["links_found"]
+        for result in results
+    )
+
+    tested_links = sum(
+        result["links_tested"]
+        for result in results
+    )
+
+    total_buttons = sum(
+        result["buttons_found"]
+        for result in results
+    )
+
+    tested_buttons = sum(
+        result["buttons_tested"]
+        for result in results
+    )
 
     print()
-    print("=" * 45)
-    print("             TEST RESULT")
-    print("=" * 45)
+    print("=" * 60)
+    print("                 FINAL REPORT")
+    print("=" * 60)
     print()
 
     print(
-        f"Website: {results['website']}"
+        f"Pages tested:       {total_pages}"
     )
 
     print(
-        f"Status: {results['status']}"
+        f"Pages passed:       {passed_pages}"
     )
 
     print(
-        f"HTTP Status: "
-        f"{results['http_status']}"
+        f"Pages failed:       {failed_pages}"
+    )
+
+    print()
+
+    print(
+        f"Links discovered:   {total_links}"
     )
 
     print(
-        f"Page Title: "
-        f"{results['title']}"
+        f"Links tested:       {tested_links}"
+    )
+
+    print()
+
+    print(
+        f"Buttons discovered: {total_buttons}"
     )
 
     print(
-        f"Content Found: "
-        f"{results['content_found']}"
+        f"Buttons tested:     {tested_buttons}"
     )
 
-    if results["screenshot"]:
+    print()
+
+    print("-" * 60)
+
+    for number, result in enumerate(
+        results,
+        start=1
+    ):
+
+        if result["status"] == "PASSED":
+
+            symbol = "✓"
+
+        else:
+
+            symbol = "✗"
 
         print(
-            f"Screenshot: "
-            f"{results['screenshot']}"
+            f"{symbol} {number}. "
+            f"{result['url']}"
         )
 
-    if results["error"]:
-
-        print()
-        print("Error:")
-        print(results["error"])
-
-    print()
-    print("=" * 45)
-
-    if results["status"] == "PASSED":
+        print(
+            f"   HTTP: "
+            f"{result['http_status']}"
+        )
 
         print(
-            "       ✓ WEBSITE TEST PASSED"
+            f"   Title: "
+            f"{result['title']}"
+        )
+
+        print(
+            f"   Links: "
+            f"{result['links_tested']}/"
+            f"{result['links_found']}"
+        )
+
+        print(
+            f"   Buttons: "
+            f"{result['buttons_tested']}/"
+            f"{result['buttons_found']}"
+        )
+
+        if result["interaction_errors"]:
+
+            print(
+                "   Problems:"
+            )
+
+            for error in result[
+                "interaction_errors"
+            ]:
+
+                print(
+                    f"     - {error}"
+                )
+
+        if result["error"]:
+
+            print(
+                f"   Error: "
+                f"{result['error']}"
+            )
+
+        print()
+
+    print("=" * 60)
+
+    if failed_pages == 0:
+
+        print(
+            "✓ ALL TESTED PAGES PASSED"
         )
 
     else:
 
         print(
-            "       ✗ WEBSITE TEST FAILED"
+            f"✗ {failed_pages} "
+            f"PAGE(S) FAILED"
         )
 
-    print("=" * 45)
+    print("=" * 60)
     print()
 
 
