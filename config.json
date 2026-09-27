@@ -1,0 +1,7 @@
+{
+    "website_url": "https://example.com/this-page-does-not-exist",
+    "browser": "chromium",
+    "headless": false,
+    "timeout": 30000,
+    "screenshot": true
+}
