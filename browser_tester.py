@@ -1,53 +1,89 @@
 import json
 import os
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse, urljoin
 
 from playwright.sync_api import sync_playwright
 
 
 class BrowserTester:
 
-    def __init__(self, config_file="config.json"):
-        self.config_file = config_file
+    def __init__(self):
+
         self.config = self.load_config()
 
-    # ==========================================
-    # CONFIGURATION
-    # ==========================================
+        self.base_url = self.config["website_url"].rstrip("/")
+
+        self.browser_name = self.config.get(
+            "browser",
+            "chromium"
+        )
+
+        self.timeout = self.config.get(
+            "timeout",
+            30000
+        )
+
+        self.max_pages = self.config.get(
+            "max_pages",
+            10
+        )
+
+        self.screenshot_enabled = self.config.get(
+            "screenshot",
+            True
+        )
+
+        self.test_links_enabled = self.config.get(
+            "test_links",
+            True
+        )
+
+        self.test_buttons_enabled = self.config.get(
+            "test_buttons",
+            True
+        )
+
+        self.test_forms_enabled = self.config.get(
+            "test_forms",
+            True
+        )
+
+    # ==================================================
+    # CONFIG
+    # ==================================================
 
     def load_config(self):
 
         with open(
-            self.config_file,
+            "config.json",
             "r",
             encoding="utf-8"
         ) as file:
 
             return json.load(file)
 
-    # ==========================================
+    # ==================================================
     # URL HELPERS
-    # ==========================================
+    # ==================================================
 
     def get_domain(self, url):
 
-        parsed_url = urlparse(url)
+        return urlparse(url).netloc
 
-        return parsed_url.netloc
+    def is_internal_link(self, url):
 
-    def is_internal_link(
-        self,
-        link,
-        base_url
-    ):
+        try:
 
-        link_domain = self.get_domain(link)
-        base_domain = self.get_domain(base_url)
+            return (
+                self.get_domain(url)
+                == self.get_domain(
+                    self.base_url
+                )
+            )
 
-        return (
-            link_domain == base_domain
-            or link_domain == ""
-        )
+        except Exception:
+
+            return False
 
     def clean_url(self, url):
 
@@ -57,21 +93,19 @@ class BrowserTester:
             fragment=""
         ).geturl()
 
-    # ==========================================
+    # ==================================================
     # FIND LINKS
-    # ==========================================
+    # ==================================================
 
-    def find_links(
-        self,
-        page,
-        current_url
-    ):
+    def find_links(self, page):
 
         links = page.locator("a")
 
-        discovered_links = []
+        found_links = []
 
-        for i in range(links.count()):
+        for i in range(
+            links.count()
+        ):
 
             try:
 
@@ -82,11 +116,9 @@ class BrowserTester:
                 if not href:
                     continue
 
-                if href.startswith("#"):
-                    continue
-
                 if href.startswith(
                     (
+                        "#",
                         "mailto:",
                         "tel:",
                         "javascript:"
@@ -95,7 +127,7 @@ class BrowserTester:
                     continue
 
                 full_url = urljoin(
-                    current_url,
+                    page.url,
                     href
                 )
 
@@ -104,16 +136,12 @@ class BrowserTester:
                 )
 
                 if self.is_internal_link(
-                    full_url,
-                    current_url
+                    full_url
                 ):
 
-                    if (
-                        full_url
-                        not in discovered_links
-                    ):
+                    if full_url not in found_links:
 
-                        discovered_links.append(
+                        found_links.append(
                             full_url
                         )
 
@@ -121,11 +149,445 @@ class BrowserTester:
 
                 continue
 
-        return discovered_links
+        return found_links
 
-    # ==========================================
-    # TEST PAGE
-    # ==========================================
+    # ==================================================
+    # LINK TESTING
+    # ==================================================
+
+    def test_links(
+        self,
+        page,
+        links
+    ):
+
+        tested = 0
+
+        errors = []
+
+        for url in links:
+
+            try:
+
+                response = page.request.get(
+                    url,
+                    timeout=self.timeout
+                )
+
+                tested += 1
+
+                if response.status >= 400:
+
+                    errors.append(
+                        {
+                            "type": "Broken Link",
+                            "url": url,
+                            "details": (
+                                f"HTTP status "
+                                f"{response.status}"
+                            )
+                        }
+                    )
+
+            except Exception as error:
+
+                tested += 1
+
+                errors.append(
+                    {
+                        "type": "Link Request Error",
+                        "url": url,
+                        "details": str(error)
+                    }
+                )
+
+        return tested, errors
+
+    # ==================================================
+    # BUTTON TESTING
+    # ==================================================
+
+    def test_buttons(
+        self,
+        page
+    ):
+
+        buttons = page.locator(
+            "button"
+        )
+
+        found = buttons.count()
+
+        tested = 0
+
+        errors = []
+
+        dangerous_words = [
+            "delete",
+            "remove",
+            "logout",
+            "log out",
+            "sign out",
+            "cancel",
+            "cancel booking",
+            "purchase",
+            "pay",
+            "checkout"
+        ]
+
+        for i in range(found):
+
+            try:
+
+                button = buttons.nth(i)
+
+                if not button.is_visible():
+                    continue
+
+                if not button.is_enabled():
+                    continue
+
+                text = (
+                    button.inner_text()
+                    .strip()
+                    .lower()
+                )
+
+                if any(
+                    word in text
+                    for word in dangerous_words
+                ):
+                    continue
+
+                tested += 1
+
+                before_url = page.url
+
+                try:
+
+                    button.click(
+                        timeout=self.timeout
+                    )
+
+                    page.wait_for_timeout(
+                        500
+                    )
+
+                except Exception as error:
+
+                    errors.append(
+                        {
+                            "type": "Button Error",
+                            "url": before_url,
+                            "details": (
+                                f"Button '{text}': "
+                                f"{str(error)}"
+                            )
+                        }
+                    )
+
+                try:
+
+                    if page.url != before_url:
+
+                        page.goto(
+                            before_url,
+                            wait_until="domcontentloaded",
+                            timeout=self.timeout
+                        )
+
+                except Exception:
+
+                    pass
+
+            except Exception as error:
+
+                errors.append(
+                    {
+                        "type": "Button Detection Error",
+                        "url": page.url,
+                        "details": str(error)
+                    }
+                )
+
+        return found, tested, errors
+
+    # ==================================================
+    # FORM ANALYSIS
+    # ==================================================
+
+    def analyze_form(
+        self,
+        form
+    ):
+
+        action = form.get_attribute(
+            "action"
+        )
+
+        method = form.get_attribute(
+            "method"
+        )
+
+        if not method:
+
+            method = "GET"
+
+        fields = form.locator(
+            "input, textarea, select"
+        )
+
+        field_details = []
+
+        required_fields = []
+
+        for i in range(
+            fields.count()
+        ):
+
+            field = fields.nth(i)
+
+            try:
+
+                field_type = (
+                    field.get_attribute(
+                        "type"
+                    )
+                    or "text"
+                )
+
+                name = (
+                    field.get_attribute(
+                        "name"
+                    )
+                    or ""
+                )
+
+                field_id = (
+                    field.get_attribute(
+                        "id"
+                    )
+                    or ""
+                )
+
+                placeholder = (
+                    field.get_attribute(
+                        "placeholder"
+                    )
+                    or ""
+                )
+
+                required = (
+                    field.get_attribute(
+                        "required"
+                    )
+                    is not None
+                )
+
+                details = {
+                    "type": field_type,
+                    "name": name,
+                    "id": field_id,
+                    "placeholder": placeholder,
+                    "required": required
+                }
+
+                field_details.append(
+                    details
+                )
+
+                if required:
+
+                    required_fields.append(
+                        details
+                    )
+
+            except Exception:
+
+                continue
+
+        submit_buttons = form.locator(
+            "button[type='submit'], "
+            "input[type='submit'], "
+            "button:not([type])"
+        )
+
+        return {
+            "action": action or "",
+            "method": method.upper(),
+            "fields": field_details,
+            "required_fields": required_fields,
+            "submit_buttons": submit_buttons.count()
+        }
+
+    # ==================================================
+    # FORM TESTING
+    # ==================================================
+
+    def test_forms(
+        self,
+        page
+    ):
+
+        forms = page.locator(
+            "form"
+        )
+
+        found = forms.count()
+
+        tested = 0
+
+        details = []
+
+        errors = []
+
+        for i in range(found):
+
+            try:
+
+                form = forms.nth(i)
+
+                info = self.analyze_form(
+                    form
+                )
+
+                info["form_number"] = i + 1
+
+                details.append(
+                    info
+                )
+
+                tested += 1
+
+                required_fields = form.locator(
+                    "input:required, "
+                    "textarea:required, "
+                    "select:required"
+                )
+
+                submit_buttons = form.locator(
+                    "button[type='submit'], "
+                    "input[type='submit'], "
+                    "button:not([type])"
+                )
+
+                if (
+                    required_fields.count()
+                    > 0
+                    and submit_buttons.count()
+                    > 0
+                ):
+
+                    try:
+
+                        submit_button = (
+                            submit_buttons.nth(0)
+                        )
+
+                        if (
+                            submit_button.is_visible()
+                            and submit_button.is_enabled()
+                        ):
+
+                            submit_button.click(
+                                timeout=3000
+                            )
+
+                            page.wait_for_timeout(
+                                500
+                            )
+
+                            invalid_fields = page.locator(
+                                ":invalid"
+                            )
+
+                            if (
+                                invalid_fields.count()
+                                == 0
+                            ):
+
+                                errors.append(
+                                    {
+                                        "type": "Form Validation",
+                                        "url": page.url,
+                                        "details": (
+                                            "Required fields "
+                                            "exist, but browser "
+                                            "validation did not "
+                                            "detect an invalid "
+                                            "empty submission."
+                                        )
+                                    }
+                                )
+
+                    except Exception as error:
+
+                        errors.append(
+                            {
+                                "type": "Form Test Error",
+                                "url": page.url,
+                                "details": str(error)
+                            }
+                        )
+
+            except Exception as error:
+
+                errors.append(
+                    {
+                        "type": "Form Detection Error",
+                        "url": page.url,
+                        "details": str(error)
+                    }
+                )
+
+        return (
+            found,
+            tested,
+            details,
+            errors
+        )
+
+    # ==================================================
+    # RESOURCE ERROR
+    # ==================================================
+
+    def classify_resource(
+        self,
+        resource_type
+    ):
+
+        resource_map = {
+
+            "stylesheet": "CSS",
+
+            "script": "JavaScript",
+
+            "image": "Image",
+
+            "font": "Font",
+
+            "media": "Media",
+
+            "xhr": "API/XHR",
+
+            "fetch": "API/Fetch",
+
+            "document": "HTML",
+
+            "manifest": "Manifest",
+
+            "texttrack": "Text Track"
+
+        }
+
+        return resource_map.get(
+            resource_type,
+            resource_type
+        )
+
+    # ==================================================
+    # PAGE TESTING
+    # ==================================================
 
     def test_page(
         self,
@@ -135,944 +597,612 @@ class BrowserTester:
     ):
 
         result = {
+
             "url": url,
+
             "status": "FAILED",
+
             "http_status": None,
+
             "title": None,
+
             "content_found": False,
 
             "links_found": 0,
+
             "links_tested": 0,
 
             "buttons_found": 0,
+
             "buttons_tested": 0,
 
             "forms_found": 0,
+
             "forms_tested": 0,
 
             "form_details": [],
 
+            "console_errors": [],
+
+            "network_errors": [],
+
             "interaction_errors": [],
 
             "screenshot": None,
+
             "error": None
         }
 
+        console_errors = []
+
+        network_errors = []
+
+        # ------------------------------------------------
+        # Console
+        # ------------------------------------------------
+
+        def handle_console(message):
+
+            try:
+
+                if message.type == "error":
+
+                    console_errors.append(
+                        message.text
+                    )
+
+            except Exception:
+
+                pass
+
+        # ------------------------------------------------
+        # Network responses
+        # ------------------------------------------------
+
+        def handle_response(response):
+
+            try:
+
+                if response.status >= 400:
+
+                    request = response.request
+
+                    resource_type = (
+                        request.resource_type
+                    )
+
+                    network_error = {
+
+                        "type": "HTTP Resource Error",
+
+                        "url": response.url,
+
+                        "status": response.status,
+
+                        "resource_type": resource_type,
+
+                        "resource_category": (
+                            self.classify_resource(
+                                resource_type
+                            )
+                        ),
+
+                        "source_page": page.url
+
+                    }
+
+                    network_errors.append(
+                        network_error
+                    )
+
+            except Exception:
+
+                pass
+
+        # ------------------------------------------------
+        # Failed network requests
+        # ------------------------------------------------
+
+        def handle_request_failed(
+            request
+        ):
+
+            try:
+
+                network_errors.append(
+                    {
+
+                        "type": "Network Request Failed",
+
+                        "url": request.url,
+
+                        "status": None,
+
+                        "resource_type": (
+                            request.resource_type
+                        ),
+
+                        "resource_category": (
+                            self.classify_resource(
+                                request.resource_type
+                            )
+                        ),
+
+                        "source_page": page.url,
+
+                        "failure": (
+                            request.failure
+                        )
+
+                    }
+                )
+
+            except Exception:
+
+                pass
+
+        page.on(
+            "console",
+            handle_console
+        )
+
+        page.on(
+            "response",
+            handle_response
+        )
+
+        page.on(
+            "requestfailed",
+            handle_request_failed
+        )
+
         try:
 
-            print()
-            print("=" * 60)
-            print(f"Testing page: {url}")
-            print("=" * 60)
-
-            # ----------------------------------
-            # OPEN PAGE
-            # ----------------------------------
+            # ------------------------------------------------
+            # Navigate
+            # ------------------------------------------------
 
             response = page.goto(
                 url,
-                wait_until="domcontentloaded"
+                wait_until="domcontentloaded",
+                timeout=self.timeout
             )
 
             if response:
 
-                result["http_status"] = response.status
-
-                print(
-                    f"HTTP Status: "
-                    f"{response.status}"
+                result["http_status"] = (
+                    response.status
                 )
 
-            # ----------------------------------
-            # TITLE
-            # ----------------------------------
+                if response.status >= 400:
 
-            title = page.title()
+                    result["error"] = (
+                        f"Page returned HTTP "
+                        f"{response.status}"
+                    )
 
-            result["title"] = title
+            # ------------------------------------------------
+            # Title
+            # ------------------------------------------------
 
-            print(
-                f"Page Title: {title}"
-            )
+            try:
 
-            # ----------------------------------
-            # CONTENT
-            # ----------------------------------
+                result["title"] = page.title()
 
-            body_text = page.locator(
-                "body"
-            ).inner_text()
+            except Exception:
 
-            if body_text.strip():
+                pass
 
-                result["content_found"] = True
+            # ------------------------------------------------
+            # Body
+            # ------------------------------------------------
 
-                print(
-                    "Page Content: ✓ Found"
+            try:
+
+                body_text = page.locator(
+                    "body"
+                ).inner_text()
+
+                result["content_found"] = (
+                    len(
+                        body_text.strip()
+                    ) > 0
                 )
 
-            else:
+            except Exception:
 
-                print(
-                    "Page Content: ✗ Empty"
+                pass
+
+            # ------------------------------------------------
+            # Screenshot
+            # ------------------------------------------------
+
+            if self.screenshot_enabled:
+
+                os.makedirs(
+                    "reports",
+                    exist_ok=True
                 )
-
-            # ----------------------------------
-            # LINKS
-            # ----------------------------------
-
-            links = page.locator("a")
-
-            result["links_found"] = links.count()
-
-            print(
-                f"Links Found: "
-                f"{result['links_found']}"
-            )
-
-            if self.config.get(
-                "test_links",
-                True
-            ):
-
-                self.test_links(
-                    page,
-                    url,
-                    result
-                )
-
-            # ----------------------------------
-            # BUTTONS
-            # ----------------------------------
-
-            buttons = page.locator(
-                "button"
-            )
-
-            result["buttons_found"] = (
-                buttons.count()
-            )
-
-            print(
-                f"Buttons Found: "
-                f"{result['buttons_found']}"
-            )
-
-            if self.config.get(
-                "test_buttons",
-                True
-            ):
-
-                self.test_buttons(
-                    page,
-                    result
-                )
-
-            # ----------------------------------
-            # FORMS
-            # ----------------------------------
-
-            forms = page.locator("form")
-
-            result["forms_found"] = (
-                forms.count()
-            )
-
-            print(
-                f"Forms Found: "
-                f"{result['forms_found']}"
-            )
-
-            if self.config.get(
-                "test_forms",
-                True
-            ):
-
-                self.test_forms(
-                    page,
-                    result
-                )
-
-            # ----------------------------------
-            # SCREENSHOT
-            # ----------------------------------
-
-            if self.config.get(
-                "screenshot",
-                True
-            ):
 
                 screenshot_path = (
-                    "reports/"
-                    f"page_{screenshot_number}.png"
+                    f"reports/page_"
+                    f"{screenshot_number}.png"
                 )
 
-                page.screenshot(
-                    path=screenshot_path,
-                    full_page=True
+                try:
+
+                    page.screenshot(
+                        path=screenshot_path,
+                        full_page=True
+                    )
+
+                    result["screenshot"] = (
+                        screenshot_path
+                    )
+
+                except Exception as error:
+
+                    result[
+                        "interaction_errors"
+                    ].append(
+                        {
+                            "type": "Screenshot Error",
+                            "url": url,
+                            "details": str(error)
+                        }
+                    )
+
+            # ------------------------------------------------
+            # Links
+            # ------------------------------------------------
+
+            links = self.find_links(
+                page
+            )
+
+            result["links_found"] = len(
+                links
+            )
+
+            if self.test_links_enabled:
+
+                (
+                    links_tested,
+                    link_errors
+                ) = self.test_links(
+                    page,
+                    links
                 )
 
-                result["screenshot"] = (
-                    screenshot_path
+                result[
+                    "links_tested"
+                ] = links_tested
+
+                result[
+                    "interaction_errors"
+                ].extend(
+                    link_errors
                 )
 
-                print(
-                    f"Screenshot: "
-                    f"{screenshot_path}"
+            # ------------------------------------------------
+            # Buttons
+            # ------------------------------------------------
+
+            if self.test_buttons_enabled:
+
+                (
+                    buttons_found,
+                    buttons_tested,
+                    button_errors
+                ) = self.test_buttons(
+                    page
                 )
 
-            # ----------------------------------
-            # FINAL RESULT
-            # ----------------------------------
+                result[
+                    "buttons_found"
+                ] = buttons_found
 
-            if (
-                response
-                and 200 <= response.status < 400
-                and result["content_found"]
-                and not result["interaction_errors"]
+                result[
+                    "buttons_tested"
+                ] = buttons_tested
+
+                result[
+                    "interaction_errors"
+                ].extend(
+                    button_errors
+                )
+
+            # ------------------------------------------------
+            # Forms
+            # ------------------------------------------------
+
+            if self.test_forms_enabled:
+
+                (
+                    forms_found,
+                    forms_tested,
+                    form_details,
+                    form_errors
+                ) = self.test_forms(
+                    page
+                )
+
+                result[
+                    "forms_found"
+                ] = forms_found
+
+                result[
+                    "forms_tested"
+                ] = forms_tested
+
+                result[
+                    "form_details"
+                ] = form_details
+
+                result[
+                    "interaction_errors"
+                ].extend(
+                    form_errors
+                )
+
+            # ------------------------------------------------
+            # Console errors
+            # ------------------------------------------------
+
+            result[
+                "console_errors"
+            ] = list(
+                dict.fromkeys(
+                    console_errors
+                )
+            )
+
+            # ------------------------------------------------
+            # Network errors
+            # ------------------------------------------------
+
+            unique_network_errors = []
+
+            seen_network_errors = set()
+
+            for error in network_errors:
+
+                key = (
+                    error.get(
+                        "url"
+                    ),
+                    error.get(
+                        "status"
+                    ),
+                    error.get(
+                        "resource_type"
+                    )
+                )
+
+                if key in seen_network_errors:
+
+                    continue
+
+                seen_network_errors.add(
+                    key
+                )
+
+                unique_network_errors.append(
+                    error
+                )
+
+            result[
+                "network_errors"
+            ] = unique_network_errors
+
+            # ------------------------------------------------
+            # Add console errors
+            # ------------------------------------------------
+
+            for console_error in (
+                result["console_errors"]
             ):
 
-                result["status"] = "PASSED"
+                result[
+                    "interaction_errors"
+                ].append(
+                    {
+                        "type":
+                            "JavaScript Console Error",
 
-                print(
-                    "Page Result: ✓ PASSED"
+                        "url":
+                            url,
+
+                        "details":
+                            console_error
+                    }
                 )
 
-            else:
+            # ------------------------------------------------
+            # Add network errors
+            # ------------------------------------------------
+
+            for network_error in (
+                result["network_errors"]
+            ):
+
+                result[
+                    "interaction_errors"
+                ].append(
+                    {
+                        "type":
+                            "HTTP Resource Error",
+
+                        "url":
+                            network_error["url"],
+
+                        "details":
+                            (
+                                f"HTTP "
+                                f"{network_error['status']} "
+                                f""
+                                f"{network_error['resource_category']} "
+                                f"resource"
+                            ),
+
+                        "status":
+                            network_error["status"],
+
+                        "resource_type":
+                            network_error[
+                                "resource_type"
+                            ],
+
+                        "source_page":
+                            network_error[
+                                "source_page"
+                            ]
+                    }
+                )
+
+            # ------------------------------------------------
+            # Determine final status
+            # ------------------------------------------------
+
+            if (
+                result["http_status"]
+                is not None
+                and result["http_status"] >= 400
+            ):
 
                 result["status"] = "FAILED"
 
-                print(
-                    "Page Result: ✗ FAILED"
-                )
+            elif (
+                result["interaction_errors"]
+            ):
+
+                result["status"] = "FAILED"
+
+            else:
+
+                result["status"] = "PASSED"
 
         except Exception as error:
 
             result["status"] = "FAILED"
 
-            result["error"] = str(error)
-
-            print(
-                "Page Result: ✗ FAILED"
+            result["error"] = str(
+                error
             )
 
-            print(
-                f"Error: {error}"
+            result[
+                "interaction_errors"
+            ].append(
+                {
+                    "type":
+                        "Page Error",
+
+                    "url":
+                        url,
+
+                    "details":
+                        str(error)
+                }
             )
 
         return result
 
-    # ==========================================
-    # TEST LINKS
-    # ==========================================
-
-    def test_links(
-        self,
-        page,
-        current_url,
-        result
-    ):
-
-        print()
-        print("Testing links...")
-
-        links = page.locator("a")
-
-        total_links = links.count()
-
-        tested = 0
-
-        for i in range(total_links):
-
-            try:
-
-                href = links.nth(i).get_attribute(
-                    "href"
-                )
-
-                text = links.nth(i).inner_text()
-
-                if not href:
-                    continue
-
-                if href.startswith("#"):
-                    continue
-
-                if href.startswith(
-                    (
-                        "mailto:",
-                        "tel:",
-                        "javascript:"
-                    )
-                ):
-                    continue
-
-                full_url = urljoin(
-                    current_url,
-                    href
-                )
-
-                full_url = self.clean_url(
-                    full_url
-                )
-
-                if not self.is_internal_link(
-                    full_url,
-                    current_url
-                ):
-                    continue
-
-                print(
-                    f"  Link: "
-                    f"{text.strip() or '[No text]'}"
-                )
-
-                try:
-
-                    response = page.request.get(
-                        full_url,
-                        timeout=self.config.get(
-                            "timeout",
-                            30000
-                        )
-                    )
-
-                    status = response.status
-
-                    tested += 1
-
-                    if 200 <= status < 400:
-
-                        print(
-                            f"    ✓ HTTP {status}"
-                        )
-
-                    else:
-
-                        print(
-                            f"    ✗ HTTP {status}"
-                        )
-
-                        result[
-                            "interaction_errors"
-                        ].append(
-                            f"Broken link: "
-                            f"{full_url} "
-                            f"(HTTP {status})"
-                        )
-
-                except Exception as error:
-
-                    print(
-                        "    ✗ ERROR"
-                    )
-
-                    result[
-                        "interaction_errors"
-                    ].append(
-                        f"Link error: "
-                        f"{full_url} - "
-                        f"{error}"
-                    )
-
-            except Exception:
-
-                continue
-
-        result["links_tested"] = tested
-
-    # ==========================================
-    # TEST BUTTONS
-    # ==========================================
-
-    def test_buttons(
-        self,
-        page,
-        result
-    ):
-
-        print()
-        print("Testing buttons...")
-
-        buttons = page.locator(
-            "button"
-        )
-
-        total_buttons = buttons.count()
-
-        tested = 0
-
-        dangerous_words = [
-            "delete",
-            "remove",
-            "logout",
-            "sign out",
-            "cancel booking",
-            "cancel",
-            "purchase",
-            "pay",
-            "checkout"
-        ]
-
-        for i in range(total_buttons):
-
-            try:
-
-                button = buttons.nth(i)
-
-                text = button.inner_text().strip()
-
-                if not text:
-
-                    text = "[Unnamed button]"
-
-                print(
-                    f"  Button: {text}"
-                )
-
-                lower_text = text.lower()
-
-                if any(
-                    word in lower_text
-                    for word in dangerous_words
-                ):
-
-                    print(
-                        "    SKIPPED "
-                        "(potentially destructive)"
-                    )
-
-                    continue
-
-                if not button.is_visible():
-
-                    print(
-                        "    SKIPPED "
-                        "(not visible)"
-                    )
-
-                    continue
-
-                if not button.is_enabled():
-
-                    print(
-                        "    SKIPPED "
-                        "(disabled)"
-                    )
-
-                    continue
-
-                try:
-
-                    button.click(
-                        timeout=self.config.get(
-                            "timeout",
-                            30000
-                        )
-                    )
-
-                    tested += 1
-
-                    print(
-                        "    ✓ Clicked"
-                    )
-
-                    page.wait_for_timeout(
-                        500
-                    )
-
-                except Exception as error:
-
-                    print(
-                        "    ✗ Failed"
-                    )
-
-                    result[
-                        "interaction_errors"
-                    ].append(
-                        f"Button error: "
-                        f"{text} - "
-                        f"{error}"
-                    )
-
-            except Exception as error:
-
-                result[
-                    "interaction_errors"
-                ].append(
-                    f"Button inspection error: "
-                    f"{error}"
-                )
-
-        result["buttons_tested"] = tested
-
-    # ==========================================
-    # ANALYZE FORM
-    # ==========================================
-
-    def analyze_form(
-        self,
-        form,
-        form_number
-    ):
-
-        details = {
-            "form_number": form_number,
-            "action": None,
-            "method": None,
-            "inputs": [],
-            "required_fields": [],
-            "submit_buttons": []
-        }
-
-        # --------------------------------------
-        # FORM ACTION
-        # --------------------------------------
-
-        details["action"] = (
-            form.get_attribute("action")
-            or ""
-        )
-
-        details["method"] = (
-            form.get_attribute("method")
-            or "GET"
-        ).upper()
-
-        # --------------------------------------
-        # INPUTS
-        # --------------------------------------
-
-        inputs = form.locator(
-            "input, textarea, select"
-        )
-
-        for i in range(inputs.count()):
-
-            try:
-
-                element = inputs.nth(i)
-
-                tag_name = element.evaluate(
-                    "(el) => el.tagName.toLowerCase()"
-                )
-
-                input_type = (
-                    element.get_attribute("type")
-                    or (
-                        "textarea"
-                        if tag_name == "textarea"
-                        else (
-                            "select"
-                            if tag_name == "select"
-                            else "text"
-                        )
-                    )
-                )
-
-                name = (
-                    element.get_attribute("name")
-                    or ""
-                )
-
-                element_id = (
-                    element.get_attribute("id")
-                    or ""
-                )
-
-                placeholder = (
-                    element.get_attribute(
-                        "placeholder"
-                    )
-                    or ""
-                )
-
-                required = element.is_required()
-
-                field = {
-                    "tag": tag_name,
-                    "type": input_type,
-                    "name": name,
-                    "id": element_id,
-                    "placeholder": placeholder,
-                    "required": required
-                }
-
-                details["inputs"].append(
-                    field
-                )
-
-                if required:
-
-                    details[
-                        "required_fields"
-                    ].append(
-                        name
-                        or element_id
-                        or placeholder
-                        or input_type
-                    )
-
-            except Exception:
-
-                continue
-
-        # --------------------------------------
-        # SUBMIT BUTTONS
-        # --------------------------------------
-
-        submit_buttons = form.locator(
-            "button[type='submit'], "
-            "input[type='submit']"
-        )
-
-        for i in range(
-            submit_buttons.count()
-        ):
-
-            try:
-
-                button = submit_buttons.nth(i)
-
-                text = (
-                    button.inner_text().strip()
-                    if button.evaluate(
-                        "(el) => el.tagName.toLowerCase() === 'button'"
-                    )
-                    else (
-                        button.get_attribute(
-                            "value"
-                        )
-                        or "Submit"
-                    )
-                )
-
-                details[
-                    "submit_buttons"
-                ].append(text)
-
-            except Exception:
-
-                continue
-
-        return details
-
-    # ==========================================
-    # TEST FORMS
-    # ==========================================
-
-    def test_forms(
-        self,
-        page,
-        result
-    ):
-
-        print()
-        print("Testing forms...")
-
-        forms = page.locator("form")
-
-        total_forms = forms.count()
-
-        print(
-            f"  Total forms: {total_forms}"
-        )
-
-        tested = 0
-
-        for i in range(total_forms):
-
-            form_number = i + 1
-
-            try:
-
-                form = forms.nth(i)
-
-                print()
-                print(
-                    f"  Form {form_number}"
-                )
-
-                details = self.analyze_form(
-                    form,
-                    form_number
-                )
-
-                result[
-                    "form_details"
-                ].append(details)
-
-                # --------------------------------
-                # DISPLAY FORM INFORMATION
-                # --------------------------------
-
-                print(
-                    f"    Method: "
-                    f"{details['method']}"
-                )
-
-                print(
-                    f"    Action: "
-                    f"{details['action'] or '[current page]'}"
-                )
-
-                print(
-                    f"    Fields: "
-                    f"{len(details['inputs'])}"
-                )
-
-                print(
-                    f"    Required fields: "
-                    f"{len(details['required_fields'])}"
-                )
-
-                print(
-                    f"    Submit buttons: "
-                    f"{len(details['submit_buttons'])}"
-                )
-
-                # --------------------------------
-                # CHECK REQUIRED FIELDS
-                # --------------------------------
-
-                required_fields = (
-                    form.locator(
-                        "input[required], "
-                        "textarea[required], "
-                        "select[required]"
-                    )
-                )
-
-                if required_fields.count() > 0:
-
-                    print(
-                        "    Required fields: ✓ Detected"
-                    )
-
-                else:
-
-                    print(
-                        "    Required fields: "
-                        "None detected"
-                    )
-
-                # --------------------------------
-                # EMPTY FORM TEST
-                # --------------------------------
-
-                submit_button = form.locator(
-                    "button[type='submit'], "
-                    "input[type='submit']"
-                ).first
-
-                if submit_button.count() > 0:
-
-                    if submit_button.is_visible():
-
-                        print(
-                            "    Empty submission test..."
-                        )
-
-                        try:
-
-                            # We only test browser
-                            # validation here.
-                            #
-                            # We do NOT force-submit
-                            # a real form.
-
-                            submit_button.click(
-                                timeout=5000
-                            )
-
-                            page.wait_for_timeout(
-                                500
-                            )
-
-                            invalid_count = (
-                                form.locator(
-                                    ":invalid"
-                                ).count()
-                            )
-
-                            if (
-                                required_fields.count()
-                                > 0
-                                and invalid_count > 0
-                            ):
-
-                                print(
-                                    "    ✓ Browser "
-                                    "validation detected"
-                                )
-
-                            elif (
-                                required_fields.count()
-                                == 0
-                            ):
-
-                                print(
-                                    "    ✓ Form has "
-                                    "no required fields"
-                                )
-
-                            else:
-
-                                print(
-                                    "    ⚠ No browser "
-                                    "validation detected"
-                                )
-
-                        except Exception as error:
-
-                            print(
-                                "    ⚠ Could not "
-                                "test empty submission"
-                            )
-
-                            print(
-                                f"      {error}"
-                            )
-
-                tested += 1
-
-            except Exception as error:
-
-                print(
-                    f"    ✗ Form error: "
-                    f"{error}"
-                )
-
-                result[
-                    "interaction_errors"
-                ].append(
-                    f"Form {form_number} "
-                    f"error: {error}"
-                )
-
-        result["forms_tested"] = tested
-
-    # ==========================================
-    # CRAWL WEBSITE
-    # ==========================================
+    # ==================================================
+    # CRAWLER
+    # ==================================================
 
     def crawl_website(self):
 
-        website_url = self.config[
-            "website_url"
+        visited = set()
+
+        pages_to_visit = [
+            self.base_url
         ]
-
-        browser_name = self.config.get(
-            "browser",
-            "chromium"
-        )
-
-        headless = self.config.get(
-            "headless",
-            False
-        )
-
-        timeout = self.config.get(
-            "timeout",
-            30000
-        )
-
-        max_pages = self.config.get(
-            "max_pages",
-            10
-        )
-
-        os.makedirs(
-            "reports",
-            exist_ok=True
-        )
 
         results = []
 
-        pages_to_visit = [
-            website_url
-        ]
-
-        visited_pages = set()
-
-        print()
-        print("=" * 60)
-        print("        AI WEBSITE TESTING AGENT")
-        print("=" * 60)
-        print()
-
-        print(
-            f"Website: {website_url}"
-        )
-
-        print(
-            f"Maximum pages: {max_pages}"
-        )
-
-        print()
-
         with sync_playwright() as playwright:
 
-            if browser_name == "chromium":
+            if (
+                self.browser_name
+                == "firefox"
+            ):
 
-                browser = playwright.chromium.launch(
-                    headless=headless
+                browser = (
+                    playwright.firefox.launch(
+                        headless=self.config.get(
+                            "headless",
+                            False
+                        )
+                    )
                 )
 
-            elif browser_name == "firefox":
+            elif (
+                self.browser_name
+                == "webkit"
+            ):
 
-                browser = playwright.firefox.launch(
-                    headless=headless
-                )
-
-            elif browser_name == "webkit":
-
-                browser = playwright.webkit.launch(
-                    headless=headless
+                browser = (
+                    playwright.webkit.launch(
+                        headless=self.config.get(
+                            "headless",
+                            False
+                        )
+                    )
                 )
 
             else:
 
-                raise ValueError(
-                    f"Unsupported browser: "
-                    f"{browser_name}"
+                browser = (
+                    playwright.chromium.launch(
+                        headless=self.config.get(
+                            "headless",
+                            False
+                        )
+                    )
                 )
 
             page = browser.new_page()
-
-            page.set_default_timeout(
-                timeout
-            )
 
             screenshot_number = 1
 
             while (
                 pages_to_visit
-                and len(visited_pages)
-                < max_pages
+                and len(visited)
+                < self.max_pages
             ):
 
-                current_url = (
-                    pages_to_visit.pop(0)
+                url = pages_to_visit.pop(
+                    0
                 )
 
-                current_url = (
-                    self.clean_url(
-                        current_url
-                    )
+                url = self.clean_url(
+                    url
                 )
 
-                if current_url in visited_pages:
+                if url in visited:
 
                     continue
 
-                visited_pages.add(
-                    current_url
+                if not self.is_internal_link(
+                    url
+                ):
+
+                    continue
+
+                visited.add(
+                    url
+                )
+
+                print(
+                    f"\nTesting page "
+                    f"{len(visited)}: "
+                    f"{url}"
                 )
 
                 result = self.test_page(
                     page,
-                    current_url,
+                    url,
                     screenshot_number
                 )
 
@@ -1082,47 +1212,30 @@ class BrowserTester:
 
                 screenshot_number += 1
 
-                # --------------------------------
-                # DISCOVER MORE PAGES
-                # --------------------------------
+                try:
 
-                if (
-                    result["http_status"]
-                    and 200
-                    <= result["http_status"]
-                    < 400
-                ):
-
-                    try:
-
-                        new_links = (
-                            self.find_links(
-                                page,
-                                current_url
-                            )
+                    discovered_links = (
+                        self.find_links(
+                            page
                         )
+                    )
 
-                        for link in new_links:
+                    for link in (
+                        discovered_links
+                    ):
 
-                            if (
+                        if (
+                            link not in visited
+                            and link not in pages_to_visit
+                        ):
+
+                            pages_to_visit.append(
                                 link
-                                not in visited_pages
-                                and link
-                                not in pages_to_visit
-                                and (
-                                    len(visited_pages)
-                                    + len(pages_to_visit)
-                                    < max_pages
-                                )
-                            ):
+                            )
 
-                                pages_to_visit.append(
-                                    link
-                                )
+                except Exception:
 
-                    except Exception:
-
-                        pass
+                    pass
 
             browser.close()
 

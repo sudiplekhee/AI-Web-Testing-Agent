@@ -1,5 +1,6 @@
 {
-    "website_url": "https://example.com",
+    "website_url": "http://127.0.0.1:5000",
+    "project_directory": "C:/Users/SUDIP/OneDrive/Desktop/futsal website",
     "browser": "chromium",
     "headless": false,
     "timeout": 30000,
