@@ -11,9 +11,9 @@ class BrowserTester:
         self.config_file = config_file
         self.config = self.load_config()
 
-    # ------------------------------------------
-    # LOAD CONFIGURATION
-    # ------------------------------------------
+    # ==========================================
+    # CONFIGURATION
+    # ==========================================
 
     def load_config(self):
 
@@ -25,19 +25,15 @@ class BrowserTester:
 
             return json.load(file)
 
-    # ------------------------------------------
-    # GET DOMAIN
-    # ------------------------------------------
+    # ==========================================
+    # URL HELPERS
+    # ==========================================
 
     def get_domain(self, url):
 
         parsed_url = urlparse(url)
 
         return parsed_url.netloc
-
-    # ------------------------------------------
-    # CHECK INTERNAL LINK
-    # ------------------------------------------
 
     def is_internal_link(
         self,
@@ -46,19 +42,12 @@ class BrowserTester:
     ):
 
         link_domain = self.get_domain(link)
-
-        base_domain = self.get_domain(
-            base_url
-        )
+        base_domain = self.get_domain(base_url)
 
         return (
             link_domain == base_domain
             or link_domain == ""
         )
-
-    # ------------------------------------------
-    # CLEAN URL
-    # ------------------------------------------
 
     def clean_url(self, url):
 
@@ -68,9 +57,9 @@ class BrowserTester:
             fragment=""
         ).geturl()
 
-    # ------------------------------------------
+    # ==========================================
     # FIND LINKS
-    # ------------------------------------------
+    # ==========================================
 
     def find_links(
         self,
@@ -134,9 +123,9 @@ class BrowserTester:
 
         return discovered_links
 
-    # ------------------------------------------
+    # ==========================================
     # TEST PAGE
-    # ------------------------------------------
+    # ==========================================
 
     def test_page(
         self,
@@ -151,11 +140,20 @@ class BrowserTester:
             "http_status": None,
             "title": None,
             "content_found": False,
+
             "links_found": 0,
             "links_tested": 0,
+
             "buttons_found": 0,
             "buttons_tested": 0,
+
+            "forms_found": 0,
+            "forms_tested": 0,
+
+            "form_details": [],
+
             "interaction_errors": [],
+
             "screenshot": None,
             "error": None
         }
@@ -163,17 +161,9 @@ class BrowserTester:
         try:
 
             print()
-            print(
-                "=" * 55
-            )
-
-            print(
-                f"Testing page: {url}"
-            )
-
-            print(
-                "=" * 55
-            )
+            print("=" * 60)
+            print(f"Testing page: {url}")
+            print("=" * 60)
 
             # ----------------------------------
             # OPEN PAGE
@@ -186,9 +176,7 @@ class BrowserTester:
 
             if response:
 
-                result["http_status"] = (
-                    response.status
-                )
+                result["http_status"] = response.status
 
                 print(
                     f"HTTP Status: "
@@ -230,24 +218,17 @@ class BrowserTester:
                 )
 
             # ----------------------------------
-            # FIND LINKS
+            # LINKS
             # ----------------------------------
 
             links = page.locator("a")
 
-            link_count = links.count()
-
-            result["links_found"] = (
-                link_count
-            )
+            result["links_found"] = links.count()
 
             print(
-                f"Links Found: {link_count}"
+                f"Links Found: "
+                f"{result['links_found']}"
             )
-
-            # ----------------------------------
-            # TEST LINKS
-            # ----------------------------------
 
             if self.config.get(
                 "test_links",
@@ -261,27 +242,21 @@ class BrowserTester:
                 )
 
             # ----------------------------------
-            # FIND BUTTONS
+            # BUTTONS
             # ----------------------------------
 
             buttons = page.locator(
                 "button"
             )
 
-            button_count = buttons.count()
-
             result["buttons_found"] = (
-                button_count
+                buttons.count()
             )
 
             print(
                 f"Buttons Found: "
-                f"{button_count}"
+                f"{result['buttons_found']}"
             )
-
-            # ----------------------------------
-            # TEST BUTTONS
-            # ----------------------------------
 
             if self.config.get(
                 "test_buttons",
@@ -289,6 +264,31 @@ class BrowserTester:
             ):
 
                 self.test_buttons(
+                    page,
+                    result
+                )
+
+            # ----------------------------------
+            # FORMS
+            # ----------------------------------
+
+            forms = page.locator("form")
+
+            result["forms_found"] = (
+                forms.count()
+            )
+
+            print(
+                f"Forms Found: "
+                f"{result['forms_found']}"
+            )
+
+            if self.config.get(
+                "test_forms",
+                True
+            ):
+
+                self.test_forms(
                     page,
                     result
                 )
@@ -322,7 +322,7 @@ class BrowserTester:
                 )
 
             # ----------------------------------
-            # FINAL PAGE RESULT
+            # FINAL RESULT
             # ----------------------------------
 
             if (
@@ -362,9 +362,9 @@ class BrowserTester:
 
         return result
 
-    # ------------------------------------------
+    # ==========================================
     # TEST LINKS
-    # ------------------------------------------
+    # ==========================================
 
     def test_links(
         self,
@@ -423,12 +423,8 @@ class BrowserTester:
                     continue
 
                 print(
-                    f"  Checking link: "
+                    f"  Link: "
                     f"{text.strip() or '[No text]'}"
-                )
-
-                print(
-                    f"  URL: {full_url}"
                 )
 
                 try:
@@ -448,13 +444,13 @@ class BrowserTester:
                     if 200 <= status < 400:
 
                         print(
-                            f"  Result: ✓ {status}"
+                            f"    ✓ HTTP {status}"
                         )
 
                     else:
 
                         print(
-                            f"  Result: ✗ {status}"
+                            f"    ✗ HTTP {status}"
                         )
 
                         result[
@@ -467,6 +463,10 @@ class BrowserTester:
 
                 except Exception as error:
 
+                    print(
+                        "    ✗ ERROR"
+                    )
+
                     result[
                         "interaction_errors"
                     ].append(
@@ -475,19 +475,15 @@ class BrowserTester:
                         f"{error}"
                     )
 
-                    print(
-                        "  Result: ✗ ERROR"
-                    )
-
             except Exception:
 
                 continue
 
         result["links_tested"] = tested
 
-    # ------------------------------------------
+    # ==========================================
     # TEST BUTTONS
-    # ------------------------------------------
+    # ==========================================
 
     def test_buttons(
         self,
@@ -506,6 +502,18 @@ class BrowserTester:
 
         tested = 0
 
+        dangerous_words = [
+            "delete",
+            "remove",
+            "logout",
+            "sign out",
+            "cancel booking",
+            "cancel",
+            "purchase",
+            "pay",
+            "checkout"
+        ]
+
         for i in range(total_buttons):
 
             try:
@@ -522,22 +530,6 @@ class BrowserTester:
                     f"  Button: {text}"
                 )
 
-                # --------------------------------
-                # SKIP DANGEROUS BUTTONS
-                # --------------------------------
-
-                dangerous_words = [
-                    "delete",
-                    "remove",
-                    "logout",
-                    "sign out",
-                    "cancel booking",
-                    "cancel",
-                    "purchase",
-                    "pay",
-                    "checkout"
-                ]
-
                 lower_text = text.lower()
 
                 if any(
@@ -546,41 +538,29 @@ class BrowserTester:
                 ):
 
                     print(
-                        "  Result: SKIPPED "
+                        "    SKIPPED "
                         "(potentially destructive)"
                     )
 
                     continue
 
-                # --------------------------------
-                # CHECK VISIBILITY
-                # --------------------------------
-
                 if not button.is_visible():
 
                     print(
-                        "  Result: SKIPPED "
+                        "    SKIPPED "
                         "(not visible)"
                     )
 
                     continue
 
-                # --------------------------------
-                # CHECK ENABLED
-                # --------------------------------
-
                 if not button.is_enabled():
 
                     print(
-                        "  Result: SKIPPED "
+                        "    SKIPPED "
                         "(disabled)"
                     )
 
                     continue
-
-                # --------------------------------
-                # CLICK BUTTON
-                # --------------------------------
 
                 try:
 
@@ -594,10 +574,9 @@ class BrowserTester:
                     tested += 1
 
                     print(
-                        "  Result: ✓ Clicked"
+                        "    ✓ Clicked"
                     )
 
-                    # Wait briefly for UI changes
                     page.wait_for_timeout(
                         500
                     )
@@ -605,7 +584,7 @@ class BrowserTester:
                 except Exception as error:
 
                     print(
-                        "  Result: ✗ Failed"
+                        "    ✗ Failed"
                     )
 
                     result[
@@ -627,9 +606,355 @@ class BrowserTester:
 
         result["buttons_tested"] = tested
 
-    # ------------------------------------------
+    # ==========================================
+    # ANALYZE FORM
+    # ==========================================
+
+    def analyze_form(
+        self,
+        form,
+        form_number
+    ):
+
+        details = {
+            "form_number": form_number,
+            "action": None,
+            "method": None,
+            "inputs": [],
+            "required_fields": [],
+            "submit_buttons": []
+        }
+
+        # --------------------------------------
+        # FORM ACTION
+        # --------------------------------------
+
+        details["action"] = (
+            form.get_attribute("action")
+            or ""
+        )
+
+        details["method"] = (
+            form.get_attribute("method")
+            or "GET"
+        ).upper()
+
+        # --------------------------------------
+        # INPUTS
+        # --------------------------------------
+
+        inputs = form.locator(
+            "input, textarea, select"
+        )
+
+        for i in range(inputs.count()):
+
+            try:
+
+                element = inputs.nth(i)
+
+                tag_name = element.evaluate(
+                    "(el) => el.tagName.toLowerCase()"
+                )
+
+                input_type = (
+                    element.get_attribute("type")
+                    or (
+                        "textarea"
+                        if tag_name == "textarea"
+                        else (
+                            "select"
+                            if tag_name == "select"
+                            else "text"
+                        )
+                    )
+                )
+
+                name = (
+                    element.get_attribute("name")
+                    or ""
+                )
+
+                element_id = (
+                    element.get_attribute("id")
+                    or ""
+                )
+
+                placeholder = (
+                    element.get_attribute(
+                        "placeholder"
+                    )
+                    or ""
+                )
+
+                required = element.is_required()
+
+                field = {
+                    "tag": tag_name,
+                    "type": input_type,
+                    "name": name,
+                    "id": element_id,
+                    "placeholder": placeholder,
+                    "required": required
+                }
+
+                details["inputs"].append(
+                    field
+                )
+
+                if required:
+
+                    details[
+                        "required_fields"
+                    ].append(
+                        name
+                        or element_id
+                        or placeholder
+                        or input_type
+                    )
+
+            except Exception:
+
+                continue
+
+        # --------------------------------------
+        # SUBMIT BUTTONS
+        # --------------------------------------
+
+        submit_buttons = form.locator(
+            "button[type='submit'], "
+            "input[type='submit']"
+        )
+
+        for i in range(
+            submit_buttons.count()
+        ):
+
+            try:
+
+                button = submit_buttons.nth(i)
+
+                text = (
+                    button.inner_text().strip()
+                    if button.evaluate(
+                        "(el) => el.tagName.toLowerCase() === 'button'"
+                    )
+                    else (
+                        button.get_attribute(
+                            "value"
+                        )
+                        or "Submit"
+                    )
+                )
+
+                details[
+                    "submit_buttons"
+                ].append(text)
+
+            except Exception:
+
+                continue
+
+        return details
+
+    # ==========================================
+    # TEST FORMS
+    # ==========================================
+
+    def test_forms(
+        self,
+        page,
+        result
+    ):
+
+        print()
+        print("Testing forms...")
+
+        forms = page.locator("form")
+
+        total_forms = forms.count()
+
+        print(
+            f"  Total forms: {total_forms}"
+        )
+
+        tested = 0
+
+        for i in range(total_forms):
+
+            form_number = i + 1
+
+            try:
+
+                form = forms.nth(i)
+
+                print()
+                print(
+                    f"  Form {form_number}"
+                )
+
+                details = self.analyze_form(
+                    form,
+                    form_number
+                )
+
+                result[
+                    "form_details"
+                ].append(details)
+
+                # --------------------------------
+                # DISPLAY FORM INFORMATION
+                # --------------------------------
+
+                print(
+                    f"    Method: "
+                    f"{details['method']}"
+                )
+
+                print(
+                    f"    Action: "
+                    f"{details['action'] or '[current page]'}"
+                )
+
+                print(
+                    f"    Fields: "
+                    f"{len(details['inputs'])}"
+                )
+
+                print(
+                    f"    Required fields: "
+                    f"{len(details['required_fields'])}"
+                )
+
+                print(
+                    f"    Submit buttons: "
+                    f"{len(details['submit_buttons'])}"
+                )
+
+                # --------------------------------
+                # CHECK REQUIRED FIELDS
+                # --------------------------------
+
+                required_fields = (
+                    form.locator(
+                        "input[required], "
+                        "textarea[required], "
+                        "select[required]"
+                    )
+                )
+
+                if required_fields.count() > 0:
+
+                    print(
+                        "    Required fields: ✓ Detected"
+                    )
+
+                else:
+
+                    print(
+                        "    Required fields: "
+                        "None detected"
+                    )
+
+                # --------------------------------
+                # EMPTY FORM TEST
+                # --------------------------------
+
+                submit_button = form.locator(
+                    "button[type='submit'], "
+                    "input[type='submit']"
+                ).first
+
+                if submit_button.count() > 0:
+
+                    if submit_button.is_visible():
+
+                        print(
+                            "    Empty submission test..."
+                        )
+
+                        try:
+
+                            # We only test browser
+                            # validation here.
+                            #
+                            # We do NOT force-submit
+                            # a real form.
+
+                            submit_button.click(
+                                timeout=5000
+                            )
+
+                            page.wait_for_timeout(
+                                500
+                            )
+
+                            invalid_count = (
+                                form.locator(
+                                    ":invalid"
+                                ).count()
+                            )
+
+                            if (
+                                required_fields.count()
+                                > 0
+                                and invalid_count > 0
+                            ):
+
+                                print(
+                                    "    ✓ Browser "
+                                    "validation detected"
+                                )
+
+                            elif (
+                                required_fields.count()
+                                == 0
+                            ):
+
+                                print(
+                                    "    ✓ Form has "
+                                    "no required fields"
+                                )
+
+                            else:
+
+                                print(
+                                    "    ⚠ No browser "
+                                    "validation detected"
+                                )
+
+                        except Exception as error:
+
+                            print(
+                                "    ⚠ Could not "
+                                "test empty submission"
+                            )
+
+                            print(
+                                f"      {error}"
+                            )
+
+                tested += 1
+
+            except Exception as error:
+
+                print(
+                    f"    ✗ Form error: "
+                    f"{error}"
+                )
+
+                result[
+                    "interaction_errors"
+                ].append(
+                    f"Form {form_number} "
+                    f"error: {error}"
+                )
+
+        result["forms_tested"] = tested
+
+    # ==========================================
     # CRAWL WEBSITE
-    # ------------------------------------------
+    # ==========================================
 
     def crawl_website(self):
 
@@ -671,9 +996,9 @@ class BrowserTester:
         visited_pages = set()
 
         print()
-        print("=" * 55)
+        print("=" * 60)
         print("        AI WEBSITE TESTING AGENT")
-        print("=" * 55)
+        print("=" * 60)
         print()
 
         print(
@@ -683,6 +1008,8 @@ class BrowserTester:
         print(
             f"Maximum pages: {max_pages}"
         )
+
+        print()
 
         with sync_playwright() as playwright:
 
@@ -725,12 +1052,14 @@ class BrowserTester:
                 < max_pages
             ):
 
-                current_url = pages_to_visit.pop(
-                    0
+                current_url = (
+                    pages_to_visit.pop(0)
                 )
 
-                current_url = self.clean_url(
-                    current_url
+                current_url = (
+                    self.clean_url(
+                        current_url
+                    )
                 )
 
                 if current_url in visited_pages:
@@ -766,9 +1095,11 @@ class BrowserTester:
 
                     try:
 
-                        new_links = self.find_links(
-                            page,
-                            current_url
+                        new_links = (
+                            self.find_links(
+                                page,
+                                current_url
+                            )
                         )
 
                         for link in new_links:

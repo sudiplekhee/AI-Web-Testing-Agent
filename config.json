@@ -1,10 +1,11 @@
 {
-    "website_url": "http://127.0.0.1:5000",
+    "website_url": "https://example.com",
     "browser": "chromium",
     "headless": false,
     "timeout": 30000,
     "screenshot": true,
     "max_pages": 10,
     "test_links": true,
-    "test_buttons": true
+    "test_buttons": true,
+    "test_forms": true
 }

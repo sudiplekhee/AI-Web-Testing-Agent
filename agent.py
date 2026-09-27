@@ -1,172 +1,131 @@
+import json
+import os
+from datetime import datetime
+
 from browser_tester import BrowserTester
 
 
-def main():
+REPORT_FOLDER = "reports"
+REPORT_FILE = os.path.join(REPORT_FOLDER, "test_report.json")
 
-    print()
-    print("Starting AI Website Testing Agent...")
-    print()
+
+def save_report(report):
+    os.makedirs(REPORT_FOLDER, exist_ok=True)
+
+    with open(REPORT_FILE, "w", encoding="utf-8") as file:
+        json.dump(report, file, indent=4, ensure_ascii=False)
+
+
+def print_summary(report):
+    print("\n")
+    print("=" * 60)
+    print("             AI WEBSITE TEST REPORT")
+    print("=" * 60)
+
+    print(f"Website:        {report['website']}")
+    print(f"Test time:      {report['test_time']}")
+    print("-" * 60)
+
+    print(f"Pages tested:   {report['summary']['pages_tested']}")
+    print(f"Pages passed:   {report['summary']['pages_passed']}")
+    print(f"Pages failed:   {report['summary']['pages_failed']}")
+    print(f"Links tested:   {report['summary']['links_tested']}")
+    print(f"Buttons tested: {report['summary']['buttons_tested']}")
+    print(f"Forms tested:   {report['summary']['forms_tested']}")
+    print(f"Errors found:   {report['summary']['errors_found']}")
+
+    print("-" * 60)
+
+    if report["errors"]:
+        print("FAILURES")
+        print()
+
+        for error in report["errors"]:
+            print(f"✗ {error['url']}")
+            print(f"  Type: {error['type']}")
+            print(f"  Details: {error['details']}")
+            print()
+
+    else:
+        print("✓ No major errors found.")
+
+    print("=" * 60)
+    print(f"Report saved to: {REPORT_FILE}")
+    print("=" * 60)
+
+
+def main():
+    print("\nStarting AI Website Testing Agent...")
+    print("Please wait while the website is being tested.\n")
 
     tester = BrowserTester()
 
     results = tester.crawl_website()
 
-    total_pages = len(results)
+    pages_tested = len(results)
+    pages_passed = 0
+    pages_failed = 0
 
-    passed_pages = sum(
-        1
-        for result in results
-        if result["status"] == "PASSED"
-    )
+    links_tested = 0
+    buttons_tested = 0
+    forms_tested = 0
 
-    failed_pages = sum(
-        1
-        for result in results
-        if result["status"] == "FAILED"
-    )
+    errors = []
 
-    total_links = sum(
-        result["links_found"]
-        for result in results
-    )
+    for result in results:
 
-    tested_links = sum(
-        result["links_tested"]
-        for result in results
-    )
-
-    total_buttons = sum(
-        result["buttons_found"]
-        for result in results
-    )
-
-    tested_buttons = sum(
-        result["buttons_tested"]
-        for result in results
-    )
-
-    print()
-    print("=" * 60)
-    print("                 FINAL REPORT")
-    print("=" * 60)
-    print()
-
-    print(
-        f"Pages tested:       {total_pages}"
-    )
-
-    print(
-        f"Pages passed:       {passed_pages}"
-    )
-
-    print(
-        f"Pages failed:       {failed_pages}"
-    )
-
-    print()
-
-    print(
-        f"Links discovered:   {total_links}"
-    )
-
-    print(
-        f"Links tested:       {tested_links}"
-    )
-
-    print()
-
-    print(
-        f"Buttons discovered: {total_buttons}"
-    )
-
-    print(
-        f"Buttons tested:     {tested_buttons}"
-    )
-
-    print()
-
-    print("-" * 60)
-
-    for number, result in enumerate(
-        results,
-        start=1
-    ):
-
-        if result["status"] == "PASSED":
-
-            symbol = "✓"
-
+        if result.get("status") == "PASSED":
+            pages_passed += 1
         else:
+            pages_failed += 1
 
-            symbol = "✗"
+        links_tested += result.get("links_tested", 0)
+        buttons_tested += result.get("buttons_tested", 0)
+        forms_tested += result.get("forms_tested", 0)
 
-        print(
-            f"{symbol} {number}. "
-            f"{result['url']}"
-        )
+        # Page-level error
+        if result.get("error"):
+            errors.append({
+                "url": result.get("url"),
+                "type": "Page Error",
+                "details": result.get("error")
+            })
 
-        print(
-            f"   HTTP: "
-            f"{result['http_status']}"
-        )
+        # Interaction errors
+        for interaction_error in result.get("interaction_errors", []):
+            errors.append({
+                "url": result.get("url"),
+                "type": "Interaction Error",
+                "details": interaction_error
+            })
 
-        print(
-            f"   Title: "
-            f"{result['title']}"
-        )
+    report = {
+        "agent": "AI Website Testing Agent",
+        "test_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 
-        print(
-            f"   Links: "
-            f"{result['links_tested']}/"
-            f"{result['links_found']}"
-        )
+        "website": tester.config.get(
+            "website_url",
+            "Unknown"
+        ),
 
-        print(
-            f"   Buttons: "
-            f"{result['buttons_tested']}/"
-            f"{result['buttons_found']}"
-        )
+        "summary": {
+            "pages_tested": pages_tested,
+            "pages_passed": pages_passed,
+            "pages_failed": pages_failed,
+            "links_tested": links_tested,
+            "buttons_tested": buttons_tested,
+            "forms_tested": forms_tested,
+            "errors_found": len(errors)
+        },
 
-        if result["interaction_errors"]:
+        "errors": errors,
 
-            print(
-                "   Problems:"
-            )
+        "pages": results
+    }
 
-            for error in result[
-                "interaction_errors"
-            ]:
+    save_report(report)
 
-                print(
-                    f"     - {error}"
-                )
-
-        if result["error"]:
-
-            print(
-                f"   Error: "
-                f"{result['error']}"
-            )
-
-        print()
-
-    print("=" * 60)
-
-    if failed_pages == 0:
-
-        print(
-            "✓ ALL TESTED PAGES PASSED"
-        )
-
-    else:
-
-        print(
-            f"✗ {failed_pages} "
-            f"PAGE(S) FAILED"
-        )
-
-    print("=" * 60)
-    print()
+    print_summary(report)
 
 
 if __name__ == "__main__":
