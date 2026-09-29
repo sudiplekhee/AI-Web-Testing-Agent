@@ -1,1007 +1,831 @@
+
 import json
 import os
-import re
 from datetime import datetime
 
+TEST_REPORT = "reports/test_report.json"
+ERROR_MAP = "reports/error_source_map.json"
+SERVER_REPORT = "reports/server_error_report.json"
+OUTPUT_FILE = "reports/fix_proposals.json"
 
-MASTER_REPORT = "reports/master_report.json"
-SOURCE_REPORT = "reports/source_report.json"
 
-OUTPUT_REPORT = "reports/fix_proposals.json"
+def load_json(path):
+    if not os.path.exists(path):
+        return {}
+
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except Exception as e:
+        print(f"Could not read {path}: {e}")
+        return {}
 
 
-class FixProposer:
+def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    def __init__(self):
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
 
-        self.master_report = {}
-        self.source_report = {}
 
-    # =========================================================
-    # LOAD JSON
-    # =========================================================
+# ============================================================
+# RESOURCE ERROR HELPERS
+# ============================================================
 
-    def load_json(self, filename):
+def is_real_resource_error(mapping):
+    """
+    Ignore page URLs such as:
+        http://127.0.0.1:5000
+        http://127.0.0.1:5000/grounds
 
-        if not os.path.exists(filename):
+    Keep actual resources such as:
+        /uploads/image.jpg
+        /static/style.css
+        /static/app.js
+    """
 
-            print(
-                f"ERROR: {filename} not found."
-            )
+    resource_url = str(
+        mapping.get("resource_url", "")
+    ).lower()
 
-            return {}
+    filename = str(
+        mapping.get("resource_filename", "")
+    ).lower()
 
-        try:
+    resource_type = str(
+        mapping.get("resource_type", "")
+    ).lower()
 
-            with open(
-                filename,
-                "r",
-                encoding="utf-8"
-            ) as file:
+    details = str(
+        mapping.get("details", "")
+    ).lower()
 
-                return json.load(file)
+    # Real resource indicators
+    resource_extensions = (
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".css",
+        ".js",
+        ".ico",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".mp4",
+        ".pdf"
+    )
 
-        except Exception as error:
-
-            print(
-                f"ERROR reading {filename}: {error}"
-            )
-
-            return {}
-
-    # =========================================================
-    # LOAD REPORTS
-    # =========================================================
-
-    def load_reports(self):
-
-        self.master_report = self.load_json(
-            MASTER_REPORT
-        )
-
-        self.source_report = self.load_json(
-            SOURCE_REPORT
-        )
-
-        if not self.master_report:
-
-            return False
-
-        if not self.source_report:
-
-            return False
-
+    if filename.endswith(resource_extensions):
         return True
 
-    # =========================================================
-    # FIND SOURCE FILE
-    # =========================================================
-
-    def find_source_file(
-        self,
-        filename
+    if resource_type in (
+        "image",
+        "stylesheet",
+        "script",
+        "font",
+        "media",
+        "document"
     ):
+        return True
 
-        if not filename:
+    if "/uploads/" in resource_url:
+        return True
 
-            return None
+    if "/static/" in resource_url:
+        return True
 
-        normalized_filename = (
-            filename
-            .replace("\\", "/")
-            .lower()
+    if "failed to load resource" in details:
+        return True
+
+    if "http 404" in details and (
+        "/uploads/" in resource_url
+        or "/static/" in resource_url
+    ):
+        return True
+
+    return False
+
+
+def normalize_mapping(mapping):
+
+    best_source = mapping.get(
+        "best_source",
+        {}
+    )
+
+    return {
+        "resource_url": mapping.get(
+            "resource_url",
+            ""
+        ),
+
+        "filename": mapping.get(
+            "resource_filename",
+            ""
+        ),
+
+        "resource_type": mapping.get(
+            "resource_type",
+            ""
+        ),
+
+        "source_page": mapping.get(
+            "source_page",
+            ""
+        ),
+
+        "error_type": mapping.get(
+            "error_type",
+            ""
+        ),
+
+        "details": mapping.get(
+            "details",
+            ""
+        ),
+
+        "existing_file": mapping.get(
+            "existing_file",
+            ""
+        ),
+
+        "source_file": best_source.get(
+            "file",
+            ""
+        ),
+
+        "source_line": best_source.get(
+            "line",
+            ""
+        ),
+
+        "source_code": best_source.get(
+            "code",
+            ""
+        ),
+
+        "match_type": best_source.get(
+            "match_type",
+            ""
+        ),
+
+        "confidence": best_source.get(
+            "confidence",
+            0
+        ),
+
+        "reason": best_source.get(
+            "reason",
+            ""
         )
+    }
 
-        for source_file in self.source_report.get(
-            "files",
-            []
-        ):
 
-            current_file = (
-                source_file
-                .get(
-                    "file",
-                    ""
+# ============================================================
+# IMAGE PROPOSAL
+# ============================================================
+
+def create_image_proposal(mapping, bug_number):
+
+    filename = mapping["filename"]
+
+    return {
+        "bug_id": bug_number,
+
+        "category": "missing_image",
+
+        "error_type": mapping["error_type"] or "HTTP 404",
+
+        "resource_url": mapping["resource_url"],
+
+        "filename": filename,
+
+        "source_file": mapping["source_file"],
+
+        "source_line": mapping["source_line"],
+
+        "source_code": mapping["source_code"],
+
+        "confidence": mapping["confidence"],
+
+        "automatic_patch": False,
+
+        "status": "MANUAL_REVIEW_REQUIRED",
+
+        "root_cause": (
+            f"The browser requested '{filename}', "
+            "but the Flask server returned HTTP 404."
+        ),
+
+        "recommended_checks": [
+            f"Check whether '{filename}' exists in the upload directory.",
+
+            "Check the UPLOAD_FOLDER configuration in app.py.",
+
+            "Check the uploaded_file route in app.py.",
+
+            f"Check the database value for the image '{filename}'.",
+
+            "Check whether the image was deleted or moved.",
+
+            "Check whether the database points to an old filename."
+        ],
+
+        "suggested_fix": (
+            "Verify the physical image file, database filename, "
+            "UPLOAD_FOLDER configuration, and uploaded_file route "
+            "before modifying the HTML template."
+        )
+    }
+
+
+# ============================================================
+# OTHER RESOURCE PROPOSAL
+# ============================================================
+
+def create_resource_proposal(mapping, bug_number):
+
+    return {
+        "bug_id": bug_number,
+
+        "category": "missing_static_resource",
+
+        "error_type": mapping["error_type"] or "HTTP 404",
+
+        "resource_url": mapping["resource_url"],
+
+        "filename": mapping["filename"],
+
+        "source_file": mapping["source_file"],
+
+        "source_line": mapping["source_line"],
+
+        "source_code": mapping["source_code"],
+
+        "confidence": mapping["confidence"],
+
+        "automatic_patch": False,
+
+        "status": "MANUAL_REVIEW_REQUIRED",
+
+        "root_cause": (
+            "The browser requested a static resource "
+            "that the server could not find."
+        ),
+
+        "recommended_checks": [
+            "Check whether the file exists.",
+            "Check the generated URL.",
+            "Check the Flask static directory.",
+            "Check filename spelling.",
+            "Check filename capitalization."
+        ]
+    }
+
+
+# ============================================================
+# SERVER TRACEBACK ANALYSIS
+# ============================================================
+
+def get_server_traceback(server_report):
+
+    traceback_analysis = server_report.get(
+        "traceback_analysis",
+        {}
+    )
+
+    exception_type = traceback_analysis.get(
+        "exception_type",
+        ""
+    )
+
+    source_locations = traceback_analysis.get(
+        "source_locations",
+        []
+    )
+
+    traceback_lines = traceback_analysis.get(
+        "traceback",
+        []
+    )
+
+    return (
+        exception_type,
+        source_locations,
+        traceback_lines
+    )
+
+
+def find_missing_module(traceback_lines):
+
+    for line in traceback_lines:
+
+        if "ModuleNotFoundError" in line:
+
+            # Example:
+            # ModuleNotFoundError: No module named 'flask_wtf'
+
+            marker = "No module named"
+
+            if marker in line:
+
+                module_name = line.split(
+                    marker,
+                    1
+                )[1].strip()
+
+                module_name = module_name.strip(
+                    "'\""
                 )
-                .replace("\\", "/")
-                .lower()
-            )
 
-            if current_file == normalized_filename:
+                return module_name
 
-                return source_file
+    return ""
 
-        # -----------------------------------------------------
-        # Try partial path
-        # -----------------------------------------------------
 
-        for source_file in self.source_report.get(
-            "files",
-            []
-        ):
+def create_server_proposals(server_report, start_bug_number):
 
-            current_file = (
-                source_file
-                .get(
-                    "file",
-                    ""
-                )
-                .replace("\\", "/")
-                .lower()
-            )
+    proposals = []
 
-            if (
-                normalized_filename in current_file
-                or current_file in normalized_filename
-            ):
+    (
+        exception_type,
+        source_locations,
+        traceback_lines
+    ) = get_server_traceback(server_report)
 
-                return source_file
+    # --------------------------------------------------------
+    # Find primary source location
+    # --------------------------------------------------------
 
-        return None
+    source_file = ""
+    source_line = ""
 
-    # =========================================================
-    # GET ERROR URL
-    # =========================================================
+    if source_locations:
 
-    def get_error_url(
-        self,
-        error
-    ):
+        first_location = source_locations[0]
 
-        if not isinstance(
-            error,
-            dict
-        ):
-
-            return None
-
-        return error.get(
-            "url"
+        source_file = first_location.get(
+            "file",
+            ""
         )
 
-    # =========================================================
-    # GET RESOURCE TYPE
-    # =========================================================
-
-    def get_resource_type(
-        self,
-        error
-    ):
-
-        if not isinstance(
-            error,
-            dict
-        ):
-
-            return ""
-
-        return str(
-            error.get(
-                "resource_type",
-                ""
-            )
-        ).lower()
-
-    # =========================================================
-    # EXTRACT FILENAME FROM URL
-    # =========================================================
-
-    def extract_filename(
-        self,
-        url
-    ):
-
-        if not url:
-
-            return None
-
-        clean_url = (
-            str(url)
-            .split("?")[0]
-            .split("#")[0]
+        source_line = first_location.get(
+            "line",
+            ""
         )
 
-        filename = (
-            clean_url
-            .rstrip("/")
-            .split("/")[-1]
-        )
+    # --------------------------------------------------------
+    # Complete traceback
+    # --------------------------------------------------------
 
-        return filename
+    traceback_text = "\n".join(
+        traceback_lines
+    )
 
-    # =========================================================
-    # FIND REFERENCES TO RESOURCE
-    # =========================================================
+    # --------------------------------------------------------
+    # Missing module
+    # --------------------------------------------------------
 
-    def find_resource_references(
-        self,
-        resource_url
-    ):
+    missing_module = find_missing_module(
+        traceback_lines
+    )
 
-        if not resource_url:
-
-            return []
-
-        filename = self.extract_filename(
-            resource_url
-        )
-
-        references = []
-
-        for source_file in self.source_report.get(
-            "files",
-            []
-        ):
-
-            content = source_file.get(
-                "content",
-                ""
-            )
-
-            if not content:
-
-                continue
-
-            if filename and filename.lower() in content.lower():
-
-                lines = content.splitlines()
-
-                matching_lines = []
-
-                for number, line in enumerate(
-                    lines,
-                    start=1
-                ):
-
-                    if filename.lower() in line.lower():
-
-                        matching_lines.append({
-                            "line": number,
-                            "content": line.strip()
-                        })
-
-                references.append({
-                    "file": source_file.get(
-                        "file"
-                    ),
-                    "matches": matching_lines
-                })
-
-        return references
-
-    # =========================================================
-    # CREATE IMAGE FIX
-    # =========================================================
-
-    def create_image_fix(
-        self,
-        error,
-        mapping
-    ):
-
-        url = self.get_error_url(
-            error
-        )
-
-        filename = self.extract_filename(
-            url
-        )
-
-        source_file = None
-
-        exact_matches = mapping.get(
-            "exact_source_matches",
-            []
-        )
-
-        if exact_matches:
-
-            source_file = exact_matches[0].get(
-                "file"
-            )
-
-        references = (
-            self.find_resource_references(
-                url
-            )
-        )
+    if missing_module:
 
         proposal = {
+            "bug_id": start_bug_number,
 
-            "problem": (
-                f"The image '{filename}' "
-                f"returns HTTP 404."
-            ),
+            "category": "missing_python_dependency",
 
-            "likely_cause": (
-                "The page references an image "
-                "that does not exist at the "
-                "requested server path."
-            ),
+            "error_type": exception_type,
 
             "source_file": source_file,
 
-            "resource_url": url,
+            "source_line": source_line,
 
-            "recommended_fix": [
-                "Verify that the image file exists.",
-                "Check whether the image is stored in the correct uploads directory.",
-                "Check the URL used by the HTML template.",
-                "Make the URL match the actual Flask static/upload configuration."
+            "module": missing_module,
+
+            "traceback": traceback_lines,
+
+            "automatic_patch": False,
+
+            "status": "MANUAL_REVIEW_REQUIRED",
+
+            "root_cause": (
+                f"The Python application imports "
+                f"'{missing_module}', but that package "
+                "is not installed in the active environment."
+            ),
+
+            "failing_code": (
+                "from flask_wtf.csrf import CSRFProtect"
+            ),
+
+            "recommended_fix": (
+                f"Install the missing package '{missing_module}' "
+                "inside the project's virtual environment."
+            ),
+
+            "recommended_commands": [
+                f"pip install {missing_module}",
+                "pip freeze > requirements.txt"
             ],
 
-            "automatic_change": False,
-
-            "reason": (
-                "The testing agent will not "
-                "create, move, or delete image "
-                "files automatically."
-            ),
-
-            "references": references
-        }
-
-        return proposal
-
-    # =========================================================
-    # CREATE CSS FIX
-    # =========================================================
-
-    def create_css_fix(
-        self,
-        error,
-        mapping
-    ):
-
-        url = self.get_error_url(
-            error
-        )
-
-        source_file = None
-
-        exact_matches = mapping.get(
-            "exact_source_matches",
-            []
-        )
-
-        if exact_matches:
-
-            source_file = exact_matches[0].get(
-                "file"
-            )
-
-        return {
-
-            "problem": (
-                f"The stylesheet '{url}' "
-                "returns HTTP 404."
-            ),
-
-            "likely_cause": (
-                "The HTML references a CSS "
-                "file that cannot be found."
-            ),
-
-            "source_file": source_file,
-
-            "resource_url": url,
-
-            "recommended_fix": [
-                "Check the stylesheet path.",
-                "Verify that the CSS file exists.",
-                "Verify the Flask static directory configuration.",
-                "Make the HTML path match the actual CSS location."
-            ],
-
-            "automatic_change": False,
-
-            "reason": (
-                "The agent will not modify "
-                "static files automatically."
+            "safety_note": (
+                "The testing agent should not automatically "
+                "install packages or modify requirements.txt "
+                "without explicit approval."
             )
         }
 
-    # =========================================================
-    # CREATE JS FIX
-    # =========================================================
+        proposals.append(
+            proposal
+        )
 
-    def create_js_fix(
-        self,
-        error,
-        mapping
+        start_bug_number += 1
+
+        return proposals
+
+    # --------------------------------------------------------
+    # Other server errors
+    # --------------------------------------------------------
+
+    category = "server_error"
+
+    recommended_fix = (
+        "Inspect the traceback and identify the exact "
+        "failing Python operation."
+    )
+
+    if "TemplateNotFound" in traceback_text:
+
+        category = "missing_template"
+
+        recommended_fix = (
+            "Check that the required HTML template exists "
+            "inside the templates directory."
+        )
+
+    elif "UndefinedError" in traceback_text:
+
+        category = "jinja_template_error"
+
+        recommended_fix = (
+            "Check the Jinja template variable and the "
+            "Python value passed to the template."
+        )
+
+    elif "TypeError" in traceback_text:
+
+        category = "python_type_error"
+
+        recommended_fix = (
+            "Inspect the failing line and verify the types "
+            "of the variables being used."
+        )
+
+    elif "IndentationError" in traceback_text:
+
+        category = "python_indentation_error"
+
+        recommended_fix = (
+            "Fix the Python indentation around the reported "
+            "line."
+        )
+
+    elif "SyntaxError" in traceback_text:
+
+        category = "python_syntax_error"
+
+        recommended_fix = (
+            "Fix the Python syntax around the reported line."
+        )
+
+    elif (
+        "sqlite3" in traceback_text
+        or "OperationalError" in traceback_text
     ):
 
-        url = self.get_error_url(
-            error
+        category = "database_error"
+
+        recommended_fix = (
+            "Check the SQLite database connection, table, "
+            "SQL query, and database structure."
         )
 
-        source_file = None
+    proposal = {
+        "bug_id": start_bug_number,
 
-        exact_matches = mapping.get(
-            "exact_source_matches",
-            []
-        )
+        "category": category,
 
-        if exact_matches:
+        "error_type": exception_type or "Python/Flask Error",
 
-            source_file = exact_matches[0].get(
-                "file"
-            )
+        "source_file": source_file,
 
-        return {
+        "source_line": source_line,
 
-            "problem": (
-                f"The JavaScript resource "
-                f"'{url}' returns HTTP 404."
-            ),
+        "traceback": traceback_lines,
 
-            "likely_cause": (
-                "The page references a JavaScript "
-                "file that cannot be found."
-            ),
+        "automatic_patch": False,
 
-            "source_file": source_file,
+        "status": "MANUAL_REVIEW_REQUIRED",
 
-            "resource_url": url,
+        "root_cause": (
+            "The Flask application produced a server-side "
+            "Python error."
+        ),
 
-            "recommended_fix": [
-                "Check the JavaScript file path.",
-                "Verify that the JS file exists.",
-                "Check the Flask static configuration.",
-                "Verify the script tag in the HTML."
-            ],
+        "recommended_fix": recommended_fix
+    }
 
-            "automatic_change": False,
+    proposals.append(
+        proposal
+    )
 
-            "reason": (
-                "The agent will not modify "
-                "JavaScript automatically."
-            )
-        }
+    return proposals
 
-    # =========================================================
-    # CREATE FLASK ROUTE FIX
-    # =========================================================
 
-    def create_route_fix(
-        self,
-        error,
-        mapping
-    ):
+# ============================================================
+# MAIN
+# ============================================================
 
-        url = self.get_error_url(
-            error
-        )
+def main():
 
-        source_file = None
+    print()
+    print("=" * 60)
+    print("INTELLIGENT FIX PROPOSAL GENERATOR")
+    print("=" * 60)
 
-        exact_matches = mapping.get(
-            "exact_source_matches",
-            []
-        )
+    test_report = load_json(
+        TEST_REPORT
+    )
 
-        if exact_matches:
+    error_map = load_json(
+        ERROR_MAP
+    )
 
-            source_file = exact_matches[0].get(
-                "file"
-            )
+    server_report = load_json(
+        SERVER_REPORT
+    )
 
-        if not source_file:
+    proposals = []
 
-            source_file = "app.py"
+    # ========================================================
+    # RESOURCE ERRORS
+    # ========================================================
 
-        return {
+    mappings = error_map.get(
+        "mappings",
+        []
+    )
 
-            "problem": (
-                f"The requested URL '{url}' "
-                "returned HTTP 404."
-            ),
+    real_mappings = []
 
-            "likely_cause": (
-                "No matching Flask route may "
-                "exist for the requested URL."
-            ),
+    seen_urls = set()
 
-            "source_file": source_file,
+    for mapping in mappings:
 
-            "resource_url": url,
+        if not isinstance(mapping, dict):
+            continue
 
-            "recommended_fix": [
-                "Check the Flask routes in app.py.",
-                "Verify that the requested URL has a corresponding route.",
-                "Check for spelling differences between the link and route.",
-                "Do not add a new route until the existing routes have been checked."
-            ],
-
-            "automatic_change": False,
-
-            "reason": (
-                "Adding routes automatically can "
-                "change application behavior, so "
-                "the agent will only propose the change."
-            )
-        }
-
-    # =========================================================
-    # CREATE PYTHON ERROR FIX
-    # =========================================================
-
-    def create_python_fix(
-        self,
-        error,
-        mapping
-    ):
-
-        details = ""
-
-        if isinstance(
-            error,
-            dict
+        if not is_real_resource_error(
+            mapping
         ):
+            continue
 
-            details = str(
-                error.get(
-                    "details",
-                    ""
-                )
-            )
-
-        exception_type = None
-
-        exception_names = [
-            "TemplateNotFound",
-            "UndefinedError",
-            "BuildError",
-            "TypeError",
-            "ValueError",
-            "KeyError",
-            "IndexError",
-            "AttributeError",
-            "NameError",
-            "ImportError",
-            "ModuleNotFoundError",
-            "IndentationError",
-            "SyntaxError",
-            "OperationalError",
-            "IntegrityError"
-        ]
-
-        for name in exception_names:
-
-            if name in details:
-
-                exception_type = name
-
-                break
-
-        source_file = None
-
-        traceback = (
-            self.master_report
-            .get(
-                "traceback_analysis",
-                {}
-            )
-        )
-
-        locations = traceback.get(
-            "source_locations",
-            []
-        )
-
-        if locations:
-
-            source_file = locations[-1].get(
-                "file"
-            )
-
-        return {
-
-            "problem": (
-                f"Server-side error detected: "
-                f"{exception_type or 'Python error'}"
-            ),
-
-            "details": details,
-
-            "exception_type": exception_type,
-
-            "source_file": source_file,
-
-            "recommended_fix": [
-                "Inspect the traceback before changing code.",
-                "Check the source file and line number.",
-                "Identify the failing function or template.",
-                "Make the smallest appropriate change.",
-                "Run the website tests again after the change."
-            ],
-
-            "automatic_change": False,
-
-            "reason": (
-                "Server-side code changes require "
-                "careful inspection before applying them."
-            )
-        }
-
-    # =========================================================
-    # CREATE GENERIC FIX
-    # =========================================================
-
-    def create_generic_fix(
-        self,
-        error,
-        mapping
-    ):
-
-        source_file = None
-
-        exact_matches = mapping.get(
-            "exact_source_matches",
-            []
-        )
-
-        if exact_matches:
-
-            source_file = exact_matches[0].get(
-                "file"
-            )
-
-        return {
-
-            "problem": (
-                "The testing agent detected "
-                "an application error."
-            ),
-
-            "source_file": source_file,
-
-            "recommended_fix": [
-                "Inspect the error details.",
-                "Inspect the mapped source file.",
-                "Make the smallest required change.",
-                "Run the tests again."
-            ],
-
-            "automatic_change": False,
-
-            "reason": (
-                "The agent does not have enough "
-                "evidence to safely generate an "
-                "automatic code change."
-            )
-        }
-
-    # =========================================================
-    # GENERATE PROPOSAL
-    # =========================================================
-
-    def generate_proposal(
-        self,
-        error,
-        mapping
-    ):
-
-        resource_type = (
-            self.get_resource_type(
-                error
-            )
-        )
-
-        status = None
-
-        if isinstance(
-            error,
-            dict
-        ):
-
-            status = error.get(
-                "status"
-            )
-
-        # -----------------------------------------------------
-        # IMAGE
-        # -----------------------------------------------------
-
-        if (
-            status == 404
-            and resource_type == "image"
-        ):
-
-            return self.create_image_fix(
-                error,
-                mapping
-            )
-
-        # -----------------------------------------------------
-        # CSS
-        # -----------------------------------------------------
-
-        if (
-            status == 404
-            and resource_type == "stylesheet"
-        ):
-
-            return self.create_css_fix(
-                error,
-                mapping
-            )
-
-        # -----------------------------------------------------
-        # JS
-        # -----------------------------------------------------
-
-        if (
-            status == 404
-            and resource_type == "script"
-        ):
-
-            return self.create_js_fix(
-                error,
-                mapping
-            )
-
-        # -----------------------------------------------------
-        # DOCUMENT / ROUTE
-        # -----------------------------------------------------
-
-        if (
-            status == 404
-            and resource_type == "document"
-        ):
-
-            return self.create_route_fix(
-                error,
-                mapping
-            )
-
-        # -----------------------------------------------------
-        # SERVER ERROR
-        # -----------------------------------------------------
-
-        error_type = ""
-
-        if isinstance(
-            error,
-            dict
-        ):
-
-            error_type = str(
-                error.get(
-                    "type",
-                    ""
-                )
-            ).lower()
-
-        if (
-            "python" in error_type
-            or "flask" in error_type
-        ):
-
-            return self.create_python_fix(
-                error,
-                mapping
-            )
-
-        # -----------------------------------------------------
-        # GENERIC
-        # -----------------------------------------------------
-
-        return self.create_generic_fix(
-            error,
+        normalized = normalize_mapping(
             mapping
         )
 
-    # =========================================================
-    # RUN
-    # =========================================================
+        url = normalized["resource_url"]
 
-    def run(self):
+        if url in seen_urls:
+            continue
 
-        if not self.load_reports():
+        seen_urls.add(url)
 
-            return
-
-        browser_errors = (
-            self.master_report
-            .get(
-                "browser_errors",
-                []
-            )
+        real_mappings.append(
+            normalized
         )
 
-        server_errors = (
-            self.master_report
-            .get(
-                "server_errors",
-                []
-            )
-        )
+    print()
+    print(
+        f"Real browser/resource errors found: "
+        f"{len(real_mappings)}"
+    )
 
-        all_errors = (
-            browser_errors
-            + server_errors
-        )
+    bug_number = 1
 
-        mappings = (
-            self.master_report
-            .get(
-                "source_mappings",
-                []
-            )
-        )
-
-        proposals = []
-
-        print()
-        print("=" * 70)
-        print("              FIX PROPOSAL GENERATOR")
-        print("=" * 70)
+    for mapping in real_mappings:
 
         print()
         print(
-            f"Errors received: "
-            f"{len(all_errors)}"
+            f"Analyzing resource error "
+            f"{bug_number}"
         )
 
-        print()
+        print(
+            f"Resource:   "
+            f"{mapping['resource_url']}"
+        )
 
-        for index, error in enumerate(
-            all_errors
+        print(
+            f"Filename:   "
+            f"{mapping['filename']}"
+        )
+
+        print(
+            f"Source:     "
+            f"{mapping['source_file'] or 'NOT FOUND'}"
+        )
+
+        print(
+            f"Line:       "
+            f"{mapping['source_line'] or 'NOT FOUND'}"
+        )
+
+        print(
+            f"Confidence: "
+            f"{mapping['confidence']}"
+        )
+
+        resource_type = (
+            mapping["resource_type"]
+            .lower()
+        )
+
+        filename = (
+            mapping["filename"]
+            .lower()
+        )
+
+        if (
+            resource_type == "image"
+            or filename.endswith(
+                (
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".gif",
+                    ".webp",
+                    ".svg"
+                )
+            )
         ):
 
-            mapping = {}
-
-            if index < len(mappings):
-
-                mapping = mappings[index]
-
-            proposal = self.generate_proposal(
-                error,
-                mapping
+            proposal = create_image_proposal(
+                mapping,
+                bug_number
             )
 
-            proposal["bug_number"] = (
-                index + 1
+        else:
+
+            proposal = create_resource_proposal(
+                mapping,
+                bug_number
             )
 
-            proposal["original_error"] = (
-                error
-            )
-
-            proposals.append(
-                proposal
-            )
-
-            print("=" * 70)
-
-            print(
-                f"FIX PROPOSAL #{index + 1}"
-            )
-
-            print("-" * 70)
-
-            print(
-                "PROBLEM:"
-            )
-
-            print(
-                proposal.get(
-                    "problem",
-                    "Unknown"
-                )
-            )
-
-            print()
-
-            print(
-                "SOURCE FILE:"
-            )
-
-            print(
-                proposal.get(
-                    "source_file"
-                )
-                or
-                "Not determined"
-            )
-
-            print()
-
-            print(
-                "RECOMMENDED ACTION:"
-            )
-
-            for action in proposal.get(
-                "recommended_fix",
-                []
-            ):
-
-                print(
-                    f"  • {action}"
-                )
-
-            print()
-
-            print(
-                "AUTOMATIC CHANGE:"
-            )
-
-            print(
-                "  NO"
-            )
-
-            print()
-
-        # =====================================================
-        # SAVE
-        # =====================================================
-
-        report = {
-
-            "agent": (
-                "AI Website Testing Agent"
-            ),
-
-            "report_type": (
-                "Fix Proposal Report"
-            ),
-
-            "generated_at": (
-                datetime.now().isoformat(
-                    timespec="seconds"
-                )
-            ),
-
-            "total_errors": len(
-                all_errors
-            ),
-
-            "proposals": proposals
-        }
-
-        os.makedirs(
-            "reports",
-            exist_ok=True
+        proposals.append(
+            proposal
         )
 
-        with open(
-            OUTPUT_REPORT,
-            "w",
-            encoding="utf-8"
-        ) as file:
+        bug_number += 1
 
-            json.dump(
-                report,
-                file,
-                indent=4,
-                ensure_ascii=False
-            )
+    # ========================================================
+    # SERVER ERRORS
+    # ========================================================
+
+    server_errors_count = server_report.get(
+        "errors_found",
+        0
+    )
+
+    print()
+    print(
+        f"Server errors found: "
+        f"{server_errors_count}"
+    )
+
+    server_proposals = create_server_proposals(
+        server_report,
+        bug_number
+    )
+
+    for proposal in server_proposals:
 
         print()
-        print("=" * 70)
-        print("FIX PROPOSAL GENERATION COMPLETE")
-        print("=" * 70)
-
         print(
-            f"Proposals generated: "
-            f"{len(proposals)}"
+            f"Analyzing server error "
+            f"{proposal['bug_id']}"
         )
 
         print(
-            f"Report saved to: "
-            f"{OUTPUT_REPORT}"
+            f"Type:       "
+            f"{proposal['error_type']}"
         )
 
-        print("=" * 70)
+        print(
+            f"Source:     "
+            f"{proposal['source_file'] or 'NOT FOUND'}"
+        )
 
+        print(
+            f"Line:       "
+            f"{proposal['source_line'] or 'NOT FOUND'}"
+        )
 
-# =============================================================
-# MAIN
-# =============================================================
+        if proposal.get("module"):
+
+            print(
+                f"Module:     "
+                f"{proposal['module']}"
+            )
+
+        proposals.append(
+            proposal
+        )
+
+    # ========================================================
+    # SUMMARY
+    # ========================================================
+
+    automatic_patches = [
+        proposal
+        for proposal in proposals
+        if proposal.get(
+            "automatic_patch"
+        ) is True
+    ]
+
+    manual_review = [
+        proposal
+        for proposal in proposals
+        if proposal.get(
+            "status"
+        ) == "MANUAL_REVIEW_REQUIRED"
+    ]
+
+    output = {
+
+        "generated_at":
+            datetime.now().isoformat(),
+
+        "project":
+            test_report.get(
+                "website",
+                "Unknown"
+            ),
+
+        "summary": {
+
+            "errors_analyzed":
+                len(proposals),
+
+            "automatic_patches":
+                len(automatic_patches),
+
+            "manual_review_required":
+                len(manual_review)
+        },
+
+        "proposals":
+            proposals
+    }
+
+    save_json(
+        OUTPUT_FILE,
+        output
+    )
+
+    print()
+    print("=" * 60)
+    print("FIX PROPOSAL GENERATION COMPLETE")
+    print("=" * 60)
+
+    print(
+        f"Errors analyzed:          "
+        f"{len(proposals)}"
+    )
+
+    print(
+        f"Automatic patches:        "
+        f"{len(automatic_patches)}"
+    )
+
+    print(
+        f"Manual review required:   "
+        f"{len(manual_review)}"
+    )
+
+    print()
+    print(
+        f"Report: {OUTPUT_FILE}"
+    )
+
 
 if __name__ == "__main__":
+    main()
 
-    proposer = FixProposer()
-
-    proposer.run()

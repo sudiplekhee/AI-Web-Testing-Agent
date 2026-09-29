@@ -1,6 +1,5 @@
-import json
 import os
-import re
+import json
 from datetime import datetime
 
 
@@ -9,566 +8,712 @@ SOURCE_REPORT = "reports/source_report.json"
 OUTPUT_REPORT = "reports/error_source_map.json"
 
 
-class ErrorSourceMapper:
+def load_json(path):
+    if not os.path.exists(path):
+        print(f"File not found: {path}")
+        return None
 
-    def __init__(self):
-        self.test_report = {}
-        self.source_report = {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Could not read {path}: {e}")
+        return None
 
-    # ---------------------------------------------------------
-    # LOAD REPORTS
-    # ---------------------------------------------------------
 
-    def load_reports(self):
-        if not os.path.exists(TEST_REPORT):
-            print(f"ERROR: {TEST_REPORT} not found.")
-            return False
+def save_json(path, data):
+    folder = os.path.dirname(path)
 
-        if not os.path.exists(SOURCE_REPORT):
-            print(f"ERROR: {SOURCE_REPORT} not found.")
-            return False
+    if folder:
+        os.makedirs(folder, exist_ok=True)
 
-        try:
-            with open(TEST_REPORT, "r", encoding="utf-8") as file:
-                self.test_report = json.load(file)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False
+        )
 
-            with open(SOURCE_REPORT, "r", encoding="utf-8") as file:
-                self.source_report = json.load(file)
 
-            return True
+def normalize(value):
+    if value is None:
+        return ""
 
-        except Exception as error:
-            print(f"ERROR loading reports: {error}")
-            return False
+    return str(value).replace("\\", "/").lower()
 
-    # ---------------------------------------------------------
-    # CONVERT ERROR TO TEXT
-    # ---------------------------------------------------------
 
-    def error_to_text(self, error):
-        if isinstance(error, str):
-            return error
+# ============================================================
+# EXTRACT ALL RESOURCE ERRORS
+# ============================================================
 
-        if isinstance(error, dict):
-            parts = []
+def extract_resource_errors(test_report):
 
-            for key, value in error.items():
-                if isinstance(value, (dict, list)):
-                    value = json.dumps(value, ensure_ascii=False)
+    errors = []
+    seen = set()
 
-                parts.append(f"{key}: {value}")
+    def add_error(source_page, error):
 
-            return " | ".join(parts)
-
-        if isinstance(error, list):
-            return " | ".join(self.error_to_text(item) for item in error)
-
-        return str(error)
-
-    # ---------------------------------------------------------
-    # GET SOURCE FILES
-    # ---------------------------------------------------------
-
-    def get_source_files(self):
-        return self.source_report.get("files", [])
-
-    # ---------------------------------------------------------
-    # NORMALIZE PATH
-    # ---------------------------------------------------------
-
-    def normalize_path(self, path):
-        if not path:
-            return ""
-
-        path = str(path)
-
-        path = path.replace("\\", "/")
-        path = path.strip()
-
-        return path.lower()
-
-    # ---------------------------------------------------------
-    # EXTRACT RESOURCE URL
-    # ---------------------------------------------------------
-
-    def extract_resource_url(self, error):
         if not isinstance(error, dict):
-            return None
+            return
 
-        url = error.get("url")
+        details = error.get("details", {})
 
-        if url:
-            return str(url)
+        if not isinstance(details, dict):
+            return
 
-        return None
+        # --------------------------------------------
+        # Possible resource URL
+        # --------------------------------------------
 
-    # ---------------------------------------------------------
-    # EXTRACT RESOURCE FILENAME
-    # ---------------------------------------------------------
-
-    def extract_filename(self, url):
-        if not url:
-            return None
-
-        clean_url = url.split("?")[0]
-        clean_url = clean_url.split("#")[0]
-
-        filename = clean_url.rstrip("/").split("/")[-1]
-
-        if filename:
-            return filename.lower()
-
-        return None
-
-    # ---------------------------------------------------------
-    # EXACT RESOURCE SEARCH
-    # ---------------------------------------------------------
-
-    def find_exact_source_matches(self, resource_url):
-        matches = []
+        resource_url = details.get("url")
 
         if not resource_url:
-            return matches
-
-        normalized_url = self.normalize_path(resource_url)
-
-        filename = self.extract_filename(resource_url)
-
-        normalized_filename = ""
-
-        if filename:
-            normalized_filename = self.normalize_path(filename)
-
-        for source_file in self.get_source_files():
-
-            file_path = source_file.get("file", "")
-            content = source_file.get("content", "")
-
-            normalized_content = self.normalize_path(content)
-
-            exact_matches = []
-
-            # ---------------------------------------------
-            # Full URL match
-            # ---------------------------------------------
-
-            if normalized_url and normalized_url in normalized_content:
-                exact_matches.append("exact URL")
-
-            # ---------------------------------------------
-            # URL path without domain
-            # ---------------------------------------------
-
-            if normalized_url.startswith("http://") or normalized_url.startswith("https://"):
-
-                try:
-                    path_part = re.sub(
-                        r"^https?://[^/]+",
-                        "",
-                        normalized_url
-                    )
-
-                    if path_part and path_part in normalized_content:
-                        exact_matches.append("exact path")
-
-                except Exception:
-                    pass
-
-            # ---------------------------------------------
-            # Filename match
-            # ---------------------------------------------
-
-            if normalized_filename:
-
-                filename_pattern = normalized_filename
-
-                if filename_pattern in normalized_content:
-                    exact_matches.append("filename")
-
-            # ---------------------------------------------
-            # Save match
-            # ---------------------------------------------
-
-            if exact_matches:
-
-                matches.append({
-                    "file": file_path,
-                    "match_type": list(dict.fromkeys(exact_matches)),
-                    "confidence": "HIGH"
-                })
-
-        return matches
-
-    # ---------------------------------------------------------
-    # CHECK EXPECTED LOCAL FILE
-    # ---------------------------------------------------------
-
-    def check_local_file(self, resource_url):
+            resource_url = error.get("url")
 
         if not resource_url:
-            return None
+            return
 
-        filename = self.extract_filename(resource_url)
+        # --------------------------------------------
+        # Resource type
+        # --------------------------------------------
 
-        if not filename:
-            return None
+        inner_type = details.get(
+            "type",
+            error.get("type", "")
+        )
 
-        project_directory = self.source_report.get(
-            "project_directory",
+        resource_type = details.get(
+            "resource_type",
             ""
         )
 
-        if not project_directory:
-            return None
+        details_text = str(
+            details
+        ).lower()
 
-        # ---------------------------------------------
-        # Possible locations
-        # ---------------------------------------------
+        error_text = str(
+            error
+        ).lower()
 
-        possible_paths = [
+        # --------------------------------------------
+        # Determine whether this is a resource error
+        # --------------------------------------------
 
-            os.path.join(
-                project_directory,
-                "uploads",
-                filename
-            ),
+        is_resource_error = False
 
-            os.path.join(
-                project_directory,
-                "static",
-                "uploads",
-                filename
-            ),
+        if inner_type in [
+            "HTTP Resource Error",
+            "Network Request Failed"
+        ]:
+            is_resource_error = True
 
-            os.path.join(
-                project_directory,
-                "static",
-                filename
-            ),
+        if resource_type:
+            is_resource_error = True
 
-            os.path.join(
-                project_directory,
-                filename
-            )
-        ]
+        if "http 404" in details_text:
+            is_resource_error = True
 
-        checked_paths = []
+        if "resource error" in error_text:
+            is_resource_error = True
 
-        for path in possible_paths:
+        if "failed to load resource" in details_text:
+            is_resource_error = True
 
-            exists = os.path.isfile(path)
+        if not is_resource_error:
+            return
 
-            checked_paths.append({
-                "path": path,
-                "exists": exists
-            })
-
-            if exists:
-
-                return {
-                    "filename": filename,
-                    "status": "FOUND",
-                    "path": path,
-                    "checked_paths": checked_paths
-                }
-
-        return {
-            "filename": filename,
-            "status": "NOT FOUND",
-            "path": None,
-            "checked_paths": checked_paths
-        }
-
-    # ---------------------------------------------------------
-    # FIND RELEVANT SOURCE FILES
-    # ---------------------------------------------------------
-
-    def find_relevant_files(self, error_text):
-
-        keywords = set()
-
-        text = error_text.lower()
-
-        words = re.findall(
-            r"[a-zA-Z0-9_\-./]+",
-            text
+        key = (
+            str(source_page),
+            str(resource_url),
+            str(resource_type)
         )
 
-        for word in words:
+        if key in seen:
+            return
 
-            if len(word) >= 3:
-                keywords.add(word)
+        seen.add(key)
 
-        scored_files = []
+        errors.append({
+            "source_page": source_page,
+            "error_type": inner_type,
+            "resource_url": resource_url,
+            "resource_type": resource_type,
+            "details": details
+        })
 
-        for source_file in self.get_source_files():
+    # ========================================================
+    # METHOD 1 — PAGE RESULTS
+    # ========================================================
 
-            file_path = source_file.get("file", "")
-            content = source_file.get("content", "")
+    pages = test_report.get(
+        "pages",
+        []
+    )
 
-            searchable = (
-                file_path.lower()
-                + " "
-                + content.lower()
+    if isinstance(pages, list):
+
+        for page in pages:
+
+            if not isinstance(page, dict):
+                continue
+
+            source_page = page.get(
+                "url",
+                ""
             )
 
-            score = 0
+            interaction_errors = page.get(
+                "interaction_errors",
+                []
+            )
 
-            for keyword in keywords:
+            if isinstance(
+                interaction_errors,
+                list
+            ):
 
-                if keyword in searchable:
-                    score += 1
+                for error in interaction_errors:
 
-            if score > 0:
+                    add_error(
+                        source_page,
+                        error
+                    )
 
-                scored_files.append({
+    # ========================================================
+    # METHOD 2 — TOP LEVEL ERRORS
+    # ========================================================
+
+    top_errors = test_report.get(
+        "errors",
+        []
+    )
+
+    if isinstance(
+        top_errors,
+        list
+    ):
+
+        for error in top_errors:
+
+            if not isinstance(
+                error,
+                dict
+            ):
+                continue
+
+            source_page = (
+                error.get("source_page")
+                or error.get("url")
+                or ""
+            )
+
+            add_error(
+                source_page,
+                error
+            )
+
+    return errors
+
+
+# ============================================================
+# FILENAME
+# ============================================================
+
+def extract_filename(url):
+
+    if not url:
+        return None
+
+    clean = str(url)
+
+    clean = clean.split("?")[0]
+    clean = clean.split("#")[0]
+
+    filename = clean.rstrip(
+        "/"
+    ).split("/")[-1]
+
+    return filename or None
+
+
+# ============================================================
+# EXACT SOURCE MATCH
+# ============================================================
+
+def find_exact_matches(
+    source_files,
+    resource_url,
+    filename
+):
+
+    matches = []
+
+    url_normalized = normalize(
+        resource_url
+    )
+
+    filename_normalized = normalize(
+        filename
+    )
+
+    for source in source_files:
+
+        file_path = source.get(
+            "file",
+            ""
+        )
+
+        content = source.get(
+            "content",
+            ""
+        )
+
+        if not content:
+            continue
+
+        lines = content.splitlines()
+
+        for line_number, line in enumerate(
+            lines,
+            start=1
+        ):
+
+            line_normalized = normalize(
+                line
+            )
+
+            # ----------------------------------------
+            # Exact URL
+            # ----------------------------------------
+
+            if (
+                url_normalized
+                and url_normalized in line_normalized
+            ):
+
+                matches.append({
                     "file": file_path,
-                    "score": score,
-                    "confidence": "LOW"
+                    "line": line_number,
+                    "code": line.strip(),
+                    "match_type": "exact_url",
+                    "confidence": 100
                 })
 
-        scored_files.sort(
-            key=lambda item: item["score"],
-            reverse=True
+                continue
+
+            # ----------------------------------------
+            # Exact filename
+            # ----------------------------------------
+
+            if (
+                filename_normalized
+                and filename_normalized in line_normalized
+            ):
+
+                matches.append({
+                    "file": file_path,
+                    "line": line_number,
+                    "code": line.strip(),
+                    "match_type": "exact_filename",
+                    "confidence": 95
+                })
+
+    return matches
+
+
+# ============================================================
+# DYNAMIC IMAGE REFERENCES
+# ============================================================
+
+def find_dynamic_image_matches(source_files):
+
+    matches = []
+
+    for source in source_files:
+
+        file_path = source.get(
+            "file",
+            ""
         )
 
-        return scored_files[:5]
+        content = source.get(
+            "content",
+            ""
+        )
 
-    # ---------------------------------------------------------
-    # ANALYZE ONE ERROR
-    # ---------------------------------------------------------
+        normalized_path = normalize(
+            file_path
+        )
 
-    def analyze_error(self, error, number):
+        if not (
+            normalized_path.endswith(".html")
+            or normalized_path.endswith(".htm")
+        ):
+            continue
 
-        error_text = self.error_to_text(error)
+        lines = content.splitlines()
 
-        resource_url = self.extract_resource_url(error)
+        for line_number, line in enumerate(
+            lines,
+            start=1
+        ):
 
-        result = {
-            "error_number": number,
-            "error": error,
-            "error_text": error_text,
-            "resource_url": resource_url,
-            "exact_source_matches": [],
-            "local_file_check": None,
-            "possible_source_files": []
+            lower = line.lower()
+
+            # <img ...>
+            if "<img" in lower:
+
+                matches.append({
+                    "file": file_path,
+                    "line": line_number,
+                    "code": line.strip(),
+                    "match_type": "html_image_tag",
+                    "confidence": 80
+                })
+
+                continue
+
+            # url_for + image/upload
+            if (
+                "url_for" in lower
+                and (
+                    "upload" in lower
+                    or "image" in lower
+                )
+            ):
+
+                matches.append({
+                    "file": file_path,
+                    "line": line_number,
+                    "code": line.strip(),
+                    "match_type": "dynamic_upload_url",
+                    "confidence": 78
+                })
+
+                continue
+
+            # upload path
+            if (
+                "/uploads/" in lower
+                or "uploads/" in lower
+            ):
+
+                matches.append({
+                    "file": file_path,
+                    "line": line_number,
+                    "code": line.strip(),
+                    "match_type": "upload_path",
+                    "confidence": 76
+                })
+
+                continue
+
+            # image variable
+            if (
+                ".image" in lower
+                or "image" in lower
+            ):
+
+                if "src" in lower:
+
+                    matches.append({
+                        "file": file_path,
+                        "line": line_number,
+                        "code": line.strip(),
+                        "match_type": "image_variable",
+                        "confidence": 70
+                    })
+
+    return matches
+
+
+# ============================================================
+# EXISTING FILE
+# ============================================================
+
+def find_existing_file(
+    project_directory,
+    filename
+):
+
+    if not project_directory or not filename:
+        return None
+
+    locations = [
+
+        os.path.join(
+            project_directory,
+            "uploads",
+            filename
+        ),
+
+        os.path.join(
+            project_directory,
+            "static",
+            "uploads",
+            filename
+        ),
+
+        os.path.join(
+            project_directory,
+            "static",
+            filename
+        ),
+
+        os.path.join(
+            project_directory,
+            filename
+        )
+    ]
+
+    for path in locations:
+
+        if os.path.exists(path):
+            return path
+
+    return None
+
+
+# ============================================================
+# MAP ONE ERROR
+# ============================================================
+
+def map_error(
+    error,
+    source_files,
+    project_directory
+):
+
+    resource_url = error.get(
+        "resource_url"
+    )
+
+    filename = extract_filename(
+        resource_url
+    )
+
+    resource_type = error.get(
+        "resource_type",
+        ""
+    )
+
+    result = {
+        "source_page": error.get(
+            "source_page"
+        ),
+        "error_type": error.get(
+            "error_type"
+        ),
+        "resource_url": resource_url,
+        "resource_filename": filename,
+        "resource_type": resource_type,
+        "existing_file": find_existing_file(
+            project_directory,
+            filename
+        ),
+        "exact_matches": [],
+        "dynamic_matches": [],
+        "best_source": None
+    }
+
+    # Exact matching
+    exact_matches = find_exact_matches(
+        source_files,
+        resource_url,
+        filename
+    )
+
+    result["exact_matches"] = exact_matches
+
+    candidates = list(
+        exact_matches
+    )
+
+    # Dynamic image matching
+    if resource_type == "image":
+
+        dynamic_matches = find_dynamic_image_matches(
+            source_files
+        )
+
+        result["dynamic_matches"] = (
+            dynamic_matches
+        )
+
+        candidates.extend(
+            dynamic_matches
+        )
+
+    candidates.sort(
+        key=lambda item: item.get(
+            "confidence",
+            0
+        ),
+        reverse=True
+    )
+
+    if candidates:
+
+        best = candidates[0]
+
+        result["best_source"] = {
+            "file": best["file"],
+            "line": best["line"],
+            "code": best["code"],
+            "match_type": best["match_type"],
+            "confidence": best["confidence"]
         }
 
-        # -----------------------------------------------------
-        # EXACT RESOURCE ANALYSIS
-        # -----------------------------------------------------
-
-        if resource_url:
-
-            exact_matches = self.find_exact_source_matches(
-                resource_url
-            )
-
-            result["exact_source_matches"] = exact_matches
-
-            result["local_file_check"] = self.check_local_file(
-                resource_url
-            )
-
-        # -----------------------------------------------------
-        # FALLBACK KEYWORD MAPPING
-        # -----------------------------------------------------
-
-        result["possible_source_files"] = self.find_relevant_files(
-            error_text
-        )
-
-        return result
-
-    # ---------------------------------------------------------
-    # ANALYZE ALL ERRORS
-    # ---------------------------------------------------------
-
-    def analyze(self):
-
-        errors = self.test_report.get("errors", [])
-
-        print()
-        print("=" * 60)
-        print("       ERROR → SOURCE CODE MAPPER")
-        print("=" * 60)
-
-        print()
-        print("Analyzing detected errors...")
-
-        mappings = []
-
-        for number, error in enumerate(errors, start=1):
-
-            result = self.analyze_error(
-                error,
-                number
-            )
-
-            mappings.append(result)
-
-            resource_url = result.get("resource_url")
-
-            print()
-            print(f"Error {number}: {resource_url or 'Unknown'}")
-
-            print()
-            print("ERROR")
-            print("-" * 60)
-
-            print(result["error_text"])
-
-            print("-" * 60)
-
-            # -------------------------------------------------
-            # EXACT SOURCE MATCH
-            # -------------------------------------------------
-
-            exact_matches = result["exact_source_matches"]
-
-            if exact_matches:
-
-                print()
-                print("EXACT SOURCE MATCHES:")
-
-                for match in exact_matches:
-
-                    print(
-                        f"  ✓ {match['file']}"
-                    )
-
-                    print(
-                        f"    Match: "
-                        f"{', '.join(match['match_type'])}"
-                    )
-
-                    print(
-                        f"    Confidence: "
-                        f"{match['confidence']}"
-                    )
-
-            else:
-
-                print()
-                print("EXACT SOURCE MATCHES:")
-                print("  None found")
-
-            # -------------------------------------------------
-            # LOCAL FILE CHECK
-            # -------------------------------------------------
-
-            local_check = result["local_file_check"]
-
-            if local_check:
-
-                print()
-                print("LOCAL FILE CHECK:")
-                print(
-                    f"  File: {local_check['filename']}"
-                )
-
-                if local_check["status"] == "FOUND":
-
-                    print("  Status: ✓ FOUND")
-                    print(
-                        f"  Path: {local_check['path']}"
-                    )
-
-                else:
-
-                    print("  Status: ✗ NOT FOUND")
-
-                    print()
-                    print("  Checked locations:")
-
-                    for checked in local_check["checked_paths"]:
-
-                        symbol = "✓" if checked["exists"] else "✗"
-
-                        print(
-                            f"    {symbol} {checked['path']}"
-                        )
-
-            # -------------------------------------------------
-            # FALLBACK RESULTS
-            # -------------------------------------------------
-
-            possible_files = result[
-                "possible_source_files"
-            ]
-
-            if possible_files:
-
-                print()
-                print(
-                    "POSSIBLE SOURCE FILES "
-                    "(keyword fallback):"
-                )
-
-                for item in possible_files:
-
-                    print(
-                        f"  {item['file']} "
-                        f"(score: {item['score']})"
-                    )
-
-        # -----------------------------------------------------
-        # SAVE REPORT
-        # -----------------------------------------------------
-
-        report = {
-            "mapper": "AI Website Testing Agent",
-            "mapping_time": datetime.now().isoformat(
-                timespec="seconds"
-            ),
-            "test_report": TEST_REPORT,
-            "source_report": SOURCE_REPORT,
-            "errors_analyzed": len(mappings),
-            "mappings": mappings
-        }
-
-        os.makedirs(
-            os.path.dirname(OUTPUT_REPORT),
-            exist_ok=True
-        )
-
-        with open(
-            OUTPUT_REPORT,
-            "w",
-            encoding="utf-8"
-        ) as file:
-
-            json.dump(
-                report,
-                file,
-                indent=4,
-                ensure_ascii=False
-            )
-
-        print()
-        print("=" * 60)
-        print("MAPPING COMPLETE")
-        print("=" * 60)
-
-        print(
-            f"Errors analyzed: {len(mappings)}"
-        )
-
-        print(
-            f"Report saved to: {OUTPUT_REPORT}"
-        )
-
-        print("=" * 60)
+    return result
 
 
-# =============================================================
+# ============================================================
 # MAIN
-# =============================================================
+# ============================================================
+
+def main():
+
+    print()
+    print("=" * 60)
+    print("SMART ERROR SOURCE MAPPER")
+    print("=" * 60)
+    print()
+
+    test_report = load_json(
+        TEST_REPORT
+    )
+
+    source_report = load_json(
+        SOURCE_REPORT
+    )
+
+    if test_report is None:
+        print(
+            "test_report.json was not found."
+        )
+        return
+
+    if source_report is None:
+        print(
+            "source_report.json was not found."
+        )
+        return
+
+    source_files = source_report.get(
+        "files",
+        []
+    )
+
+    project_directory = source_report.get(
+        "project_directory"
+    )
+
+    errors = extract_resource_errors(
+        test_report
+    )
+
+    print(
+        f"Resource errors found: {len(errors)}"
+    )
+
+    mappings = []
+
+    for index, error in enumerate(
+        errors,
+        start=1
+    ):
+
+        print()
+        print(
+            f"Analyzing resource error {index}"
+        )
+
+        mapping = map_error(
+            error,
+            source_files,
+            project_directory
+        )
+
+        mappings.append(
+            mapping
+        )
+
+        print(
+            f"Resource: "
+            f"{mapping['resource_url']}"
+        )
+
+        best = mapping.get(
+            "best_source"
+        )
+
+        if best:
+
+            print(
+                f"Source:   {best['file']}"
+            )
+
+            print(
+                f"Line:     {best['line']}"
+            )
+
+            print(
+                f"Match:    {best['match_type']}"
+            )
+
+            print(
+                f"Confidence: {best['confidence']}"
+            )
+
+            print(
+                f"Code:     {best['code']}"
+            )
+
+        else:
+
+            print(
+                "Source: NOT FOUND"
+            )
+
+        if mapping.get(
+            "existing_file"
+        ):
+
+            print(
+                "File exists: "
+                f"{mapping['existing_file']}"
+            )
+
+        else:
+
+            print(
+                "File exists: NO"
+            )
+
+    report = {
+        "tool": "AI Website Testing Agent",
+        "report_type": "Smart Error Source Mapping",
+        "generated_at": datetime.now().isoformat(),
+        "errors_analyzed": len(errors),
+        "mappings": mappings
+    }
+
+    save_json(
+        OUTPUT_REPORT,
+        report
+    )
+
+    print()
+    print("=" * 60)
+    print("MAPPING COMPLETE")
+    print("=" * 60)
+    print()
+
+    print(
+        f"Report: {OUTPUT_REPORT}"
+    )
+
 
 if __name__ == "__main__":
-
-    mapper = ErrorSourceMapper()
-
-    if mapper.load_reports():
-
-        mapper.analyze()
+    main()
