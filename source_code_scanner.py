@@ -1,176 +1,142 @@
 import json
 import os
+import re
 from datetime import datetime
 
 
+CONFIG_FILE = "config.json"
 OUTPUT_FILE = "reports/source_report.json"
 
 
-class SourceCodeScanner:
+IGNORE_DIRS = {
+    ".git",
+    ".github",
+    ".vscode",
+    ".idea",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "env",
+    ".env",
+    "node_modules",
+    "dist",
+    "build",
+    "vendor",
+    "coverage",
+    ".next",
+    ".nuxt",
+}
 
-    def __init__(self, project_directory):
 
-        self.project_directory = os.path.abspath(project_directory)
+SOURCE_EXTENSIONS = {
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".jsx": "React JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "React TypeScript",
+    ".html": "HTML",
+    ".htm": "HTML",
+    ".css": "CSS",
+    ".scss": "SCSS",
+    ".sass": "SASS",
+    ".less": "LESS",
+    ".json": "JSON",
+    ".sql": "SQL",
+    ".php": "PHP",
+    ".java": "Java",
+    ".go": "Go",
+    ".rs": "Rust",
+    ".vue": "Vue",
+    ".svelte": "Svelte",
+}
 
-        self.allowed_extensions = {
-            ".py",
-            ".html",
-            ".css",
-            ".js",
-            ".json",
-            ".txt",
-            ".md",
-            ".sql"
-        }
 
-        self.ignored_directories = {
-            ".git",
-            ".github",
-            "venv",
-            ".venv",
-            "__pycache__",
-            "node_modules",
-            ".idea",
-            ".vscode",
-            "dist",
-            "build"
-        }
+class SourceScanner:
 
-    def should_ignore_directory(self, directory_name):
+    def __init__(self):
 
-        return directory_name in self.ignored_directories
+        self.config = self.load_json(
+            CONFIG_FILE
+        )
 
-    def scan_files(self):
-
-        files = []
-
-        if not os.path.exists(self.project_directory):
-
-            raise FileNotFoundError(
-                f"Project directory does not exist:\n"
-                f"{self.project_directory}"
+        self.project_directory = (
+            self.config.get(
+                "project_directory",
+                ""
             )
+        )
 
-        for root, directories, filenames in os.walk(
-            self.project_directory
-        ):
+        self.files = []
 
-            directories[:] = [
-                directory
-                for directory in directories
-                if not self.should_ignore_directory(directory)
-            ]
+        self.statistics = {
+            "total_files": 0,
+            "python_files": 0,
+            "javascript_files": 0,
+            "typescript_files": 0,
+            "html_files": 0,
+            "css_files": 0,
+            "php_files": 0,
+            "other_source_files": 0
+        }
 
-            for filename in filenames:
+    # =========================================================
+    # LOAD JSON
+    # =========================================================
 
-                extension = os.path.splitext(
-                    filename
-                )[1].lower()
+    def load_json(self, filename):
 
-                if extension in self.allowed_extensions:
-
-                    full_path = os.path.join(
-                        root,
-                        filename
-                    )
-
-                    files.append(full_path)
-
-        return files
-
-    def read_file(self, file_path):
+        if not os.path.exists(filename):
+            return {}
 
         try:
 
             with open(
-                file_path,
+                filename,
                 "r",
                 encoding="utf-8"
             ) as file:
 
-                return file.read()
+                return json.load(file)
 
-        except UnicodeDecodeError:
+        except Exception as e:
 
-            try:
-
-                with open(
-                    file_path,
-                    "r",
-                    encoding="utf-8-sig"
-                ) as file:
-
-                    return file.read()
-
-            except Exception as error:
-
-                return f"[Unable to read file: {error}]"
-
-        except Exception as error:
-
-            return f"[Unable to read file: {error}]"
-
-    def create_file_info(self, file_path):
-
-        content = self.read_file(file_path)
-
-        relative_path = os.path.relpath(
-            file_path,
-            self.project_directory
-        )
-
-        lines = content.count("\n") + 1
-
-        return {
-            "file": relative_path.replace("\\", "/"),
-            "extension": os.path.splitext(file_path)[1].lower(),
-            "lines": lines,
-            "characters": len(content),
-            "content": content
-        }
-
-    def scan_project(self):
-
-        print("\nScanning project source code...")
-        print(f"Project: {self.project_directory}\n")
-
-        files = self.scan_files()
-
-        source_files = []
-
-        for file_path in files:
-
-            relative_path = os.path.relpath(
-                file_path,
-                self.project_directory
+            print(
+                f"Could not read {filename}: {e}"
             )
 
-            print(f"Reading: {relative_path}")
+            return {}
 
-            file_info = self.create_file_info(
-                file_path
-            )
+    # =========================================================
+    # SAVE REPORT
+    # =========================================================
 
-            source_files.append(file_info)
-
-        report = {
-            "scanner": "AI Website Testing Agent",
-            "scan_time": datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            "project_directory": self.project_directory,
-            "files_found": len(source_files),
-            "files": source_files
-        }
-
-        return report
-
-    def save_report(self, report):
+    def save_report(self):
 
         os.makedirs(
             "reports",
             exist_ok=True
         )
+
+        report = {
+
+            "agent":
+                "AI Website Testing Agent",
+
+            "component":
+                "Source Scanner",
+
+            "scan_time":
+                datetime.now().isoformat(),
+
+            "project_directory":
+                self.project_directory,
+
+            "statistics":
+                self.statistics,
+
+            "files":
+                self.files
+        }
 
         with open(
             OUTPUT_FILE,
@@ -185,69 +151,541 @@ class SourceCodeScanner:
                 ensure_ascii=False
             )
 
-    def run(self):
+    # =========================================================
+    # GET LANGUAGE
+    # =========================================================
+
+    def get_language(self, filename):
+
+        extension = os.path.splitext(
+            filename
+        )[1].lower()
+
+        return SOURCE_EXTENSIONS.get(
+            extension
+        )
+
+    # =========================================================
+    # CHECK IF SOURCE FILE
+    # =========================================================
+
+    def is_source_file(self, filename):
+
+        extension = os.path.splitext(
+            filename
+        )[1].lower()
+
+        return extension in SOURCE_EXTENSIONS
+
+    # =========================================================
+    # READ FILE
+    # =========================================================
+
+    def read_source_file(self, path):
 
         try:
 
-            report = self.scan_project()
+            with open(
+                path,
+                "r",
+                encoding="utf-8",
+                errors="ignore"
+            ) as file:
 
-            self.save_report(report)
+                return file.read()
 
-            print("\n" + "=" * 60)
-            print("SOURCE CODE SCAN COMPLETE")
-            print("=" * 60)
+        except Exception as e:
 
-            print(
-                f"Project files found: "
-                f"{report['files_found']}"
+            return ""
+
+    # =========================================================
+    # FIND FUNCTIONS / CLASSES
+    # =========================================================
+
+    def extract_symbols(
+        self,
+        content,
+        language
+    ):
+
+        symbols = []
+
+        lines = content.splitlines()
+
+        for line_number, line in enumerate(
+            lines,
+            start=1
+        ):
+
+            stripped = line.strip()
+
+            # -------------------------------------------------
+            # Python
+            # -------------------------------------------------
+
+            if language == "Python":
+
+                match = re.match(
+                    r"(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)",
+                    stripped
+                )
+
+                if match:
+
+                    symbols.append({
+
+                        "type": "function",
+
+                        "name":
+                            match.group(1),
+
+                        "line":
+                            line_number
+                    })
+
+                match = re.match(
+                    r"class\s+([A-Za-z_][A-Za-z0-9_]*)",
+                    stripped
+                )
+
+                if match:
+
+                    symbols.append({
+
+                        "type": "class",
+
+                        "name":
+                            match.group(1),
+
+                        "line":
+                            line_number
+                    })
+
+            # -------------------------------------------------
+            # JavaScript / TypeScript
+            # -------------------------------------------------
+
+            elif language in {
+                "JavaScript",
+                "React JavaScript",
+                "TypeScript",
+                "React TypeScript"
+            }:
+
+                patterns = [
+
+                    r"(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)",
+
+                    r"(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(",
+
+                    r"class\s+([A-Za-z_$][A-Za-z0-9_$]*)"
+                ]
+
+                for pattern in patterns:
+
+                    match = re.search(
+                        pattern,
+                        stripped
+                    )
+
+                    if match:
+
+                        symbols.append({
+
+                            "type": "symbol",
+
+                            "name":
+                                match.group(1),
+
+                            "line":
+                                line_number
+                        })
+
+                        break
+
+            # -------------------------------------------------
+            # PHP
+            # -------------------------------------------------
+
+            elif language == "PHP":
+
+                match = re.search(
+                    r"function\s+([A-Za-z_][A-Za-z0-9_]*)",
+                    stripped
+                )
+
+                if match:
+
+                    symbols.append({
+
+                        "type": "function",
+
+                        "name":
+                            match.group(1),
+
+                        "line":
+                            line_number
+                    })
+
+        return symbols
+
+    # =========================================================
+    # FIND WEB ROUTES
+    # =========================================================
+
+    def extract_routes(
+        self,
+        content,
+        language
+    ):
+
+        routes = []
+
+        # -----------------------------------------------------
+        # Flask
+        # -----------------------------------------------------
+
+        if language == "Python":
+
+            flask_patterns = [
+
+                r"@(?:\w+\.)?route\(\s*['\"]([^'\"]+)",
+
+                r"@(?:\w+\.)?(?:get|post|put|delete|patch)"
+                r"\(\s*['\"]([^'\"]+)"
+            ]
+
+            for pattern in flask_patterns:
+
+                matches = re.finditer(
+                    pattern,
+                    content,
+                    re.IGNORECASE
+                )
+
+                for match in matches:
+
+                    routes.append({
+
+                        "framework":
+                            "Python web framework",
+
+                        "route":
+                            match.group(1)
+                    })
+
+        # -----------------------------------------------------
+        # Express
+        # -----------------------------------------------------
+
+        if language in {
+            "JavaScript",
+            "TypeScript",
+            "React JavaScript",
+            "React TypeScript"
+        }:
+
+            pattern = (
+                r"(?:app|router)"
+                r"\."
+                r"(get|post|put|delete|patch)"
+                r"\(\s*['\"]([^'\"]+)"
             )
 
-            print(
-                f"Report saved to: "
-                f"{OUTPUT_FILE}"
+            matches = re.finditer(
+                pattern,
+                content,
+                re.IGNORECASE
             )
 
-            print("=" * 60)
+            for match in matches:
 
-        except Exception as error:
+                routes.append({
 
-            print("\nSOURCE CODE SCANNER ERROR")
-            print("-" * 60)
-            print(error)
-            print("-" * 60)
+                    "framework":
+                        "Express",
 
+                    "method":
+                        match.group(1).upper(),
 
-if __name__ == "__main__":
+                    "route":
+                        match.group(2)
+                })
 
-    if not os.path.exists("config.json"):
+        return routes
 
-        print("config.json was not found.")
+    # =========================================================
+    # ANALYZE FILE
+    # =========================================================
 
-    else:
+    def analyze_file(
+        self,
+        full_path,
+        relative_path
+    ):
 
-        with open(
-            "config.json",
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            config = json.load(file)
-
-        project_directory = config.get(
-            "project_directory"
+        language = self.get_language(
+            relative_path
         )
 
-        if not project_directory:
+        if not language:
+            return
 
-            print(
-                "project_directory is missing "
-                "from config.json"
-            )
+        content = self.read_source_file(
+            full_path
+        )
+
+        lines = content.splitlines()
+
+        symbols = self.extract_symbols(
+            content,
+            language
+        )
+
+        routes = self.extract_routes(
+            content,
+            language
+        )
+
+        file_info = {
+
+            "path":
+                relative_path,
+
+            "absolute_path":
+                full_path,
+
+            "filename":
+                os.path.basename(
+                    relative_path
+                ),
+
+            "extension":
+                os.path.splitext(
+                    relative_path
+                )[1].lower(),
+
+            "language":
+                language,
+
+            "line_count":
+                len(lines),
+
+            "size_bytes":
+                os.path.getsize(
+                    full_path
+                ),
+
+            "symbols":
+                symbols,
+
+            "routes":
+                routes,
+
+            "content":
+                content
+        }
+
+        self.files.append(
+            file_info
+        )
+
+        # -----------------------------------------------------
+        # Statistics
+        # -----------------------------------------------------
+
+        self.statistics[
+            "total_files"
+        ] += 1
+
+        if language == "Python":
+
+            self.statistics[
+                "python_files"
+            ] += 1
+
+        elif language in {
+            "JavaScript",
+            "React JavaScript"
+        }:
+
+            self.statistics[
+                "javascript_files"
+            ] += 1
+
+        elif language in {
+            "TypeScript",
+            "React TypeScript"
+        }:
+
+            self.statistics[
+                "typescript_files"
+            ] += 1
+
+        elif language == "HTML":
+
+            self.statistics[
+                "html_files"
+            ] += 1
+
+        elif language in {
+            "CSS",
+            "SCSS",
+            "SASS",
+            "LESS"
+        }:
+
+            self.statistics[
+                "css_files"
+            ] += 1
+
+        elif language == "PHP":
+
+            self.statistics[
+                "php_files"
+            ] += 1
 
         else:
 
-            scanner = SourceCodeScanner(
-                project_directory
+            self.statistics[
+                "other_source_files"
+            ] += 1
+
+    # =========================================================
+    # SCAN PROJECT
+    # =========================================================
+
+    def scan(self):
+
+        print()
+        print("=" * 60)
+        print("SOURCE CODE SCANNER")
+        print("=" * 60)
+        print()
+
+        if not self.project_directory:
+
+            print(
+                "ERROR: project_directory is missing."
             )
 
-            scanner.run()
+            return False
+
+        if not os.path.isdir(
+            self.project_directory
+        ):
+
+            print(
+                "ERROR: Project directory does not exist:"
+            )
+
+            print(
+                self.project_directory
+            )
+
+            return False
+
+        print(
+            f"Project:\n{self.project_directory}"
+        )
+
+        print()
+        print(
+            "Scanning source files..."
+        )
+
+        for root, dirs, files in os.walk(
+            self.project_directory
+        ):
+
+            dirs[:] = [
+                directory
+                for directory in dirs
+                if directory not in IGNORE_DIRS
+            ]
+
+            for filename in files:
+
+                if not self.is_source_file(
+                    filename
+                ):
+                    continue
+
+                full_path = os.path.join(
+                    root,
+                    filename
+                )
+
+                relative_path = os.path.relpath(
+                    full_path,
+                    self.project_directory
+                )
+
+                self.analyze_file(
+                    full_path,
+                    relative_path
+                )
+
+        self.save_report()
+
+        # -----------------------------------------------------
+        # Summary
+        # -----------------------------------------------------
+
+        print()
+        print("-" * 60)
+
+        print(
+            f"Total source files: "
+            f"{self.statistics['total_files']}"
+        )
+
+        print(
+            f"Python:            "
+            f"{self.statistics['python_files']}"
+        )
+
+        print(
+            f"JavaScript:        "
+            f"{self.statistics['javascript_files']}"
+        )
+
+        print(
+            f"TypeScript:        "
+            f"{self.statistics['typescript_files']}"
+        )
+
+        print(
+            f"HTML:              "
+            f"{self.statistics['html_files']}"
+        )
+
+        print(
+            f"CSS:               "
+            f"{self.statistics['css_files']}"
+        )
+
+        print(
+            f"PHP:               "
+            f"{self.statistics['php_files']}"
+        )
+
+        print("-" * 60)
+
+        print()
+        print(
+            f"Report: {OUTPUT_FILE}"
+        )
+
+        return True
+
+
+# =============================================================
+# MAIN
+# =============================================================
+
+if __name__ == "__main__":
+
+    scanner = SourceScanner()
+
+    scanner.scan()

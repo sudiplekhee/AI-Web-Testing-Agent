@@ -1,0 +1,10 @@
+{
+    "agent": "AI Website Testing Agent",
+    "component": "Server Manager",
+    "time": "2026-10-01T23:15:41.356311",
+    "project_directory": "C:\\Users\\SUDIP\\OneDrive\\Desktop\\futsal website",
+    "server_command": "python app.py",
+    "website_url": "http://127.0.0.1:5000",
+    "port": 5000,
+    "status": "ALREADY_RUNNING"
+}

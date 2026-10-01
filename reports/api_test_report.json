@@ -1,0 +1,737 @@
+{
+    "agent": "AI Website Testing Agent",
+    "component": "API Tester",
+    "test_time": "2026-10-01T23:09:41.680699",
+    "website": "http://127.0.0.1:5000",
+    "framework": "Flask",
+    "routes_discovered": 38,
+    "requests_tested": 38,
+    "successful_requests": 17,
+    "failed_requests": 21,
+    "routes": [
+        {
+            "route": "/uploads/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/esewa/pay/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/esewa/success",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/esewa/failure",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/register",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/login",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/logout",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/dashboard",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/grounds",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/ground/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/available-slots/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/book/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/booking-success/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/my-bookings",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/booking/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/cancel-booking/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/payment/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/login",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/logout",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/calendar",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/users",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/users/delete/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/grounds",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/grounds/add",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/grounds/edit/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/grounds/delete/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/bookings",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/bookings/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/bookings/cancel/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/payment/confirm/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/admin/payment/reject/test",
+            "source_type": "Flask",
+            "source_file": "app.py"
+        },
+        {
+            "route": "/api",
+            "source_type": "Common API candidate",
+            "source_file": null
+        },
+        {
+            "route": "/api/health",
+            "source_type": "Common API candidate",
+            "source_file": null
+        },
+        {
+            "route": "/api/status",
+            "source_type": "Common API candidate",
+            "source_file": null
+        },
+        {
+            "route": "/health",
+            "source_type": "Common API candidate",
+            "source_file": null
+        },
+        {
+            "route": "/healthcheck",
+            "source_type": "Common API candidate",
+            "source_file": null
+        }
+    ],
+    "results": [
+        {
+            "url": "http://127.0.0.1:5000/uploads/test",
+            "route": "/uploads/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.195,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/esewa/pay/test",
+            "route": "/esewa/pay/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.009,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/",
+            "route": "/",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.119,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/esewa/success",
+            "route": "/esewa/success",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.122,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/esewa/failure",
+            "route": "/esewa/failure",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.021,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/register",
+            "route": "/register",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.07,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/login",
+            "route": "/login",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/logout",
+            "route": "/logout",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.025,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/dashboard",
+            "route": "/dashboard",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.028,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/grounds",
+            "route": "/grounds",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.061,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/ground/test",
+            "route": "/ground/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/available-slots/test",
+            "route": "/available-slots/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/book/test",
+            "route": "/book/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/booking-success/test",
+            "route": "/booking-success/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.007,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/my-bookings",
+            "route": "/my-bookings",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.019,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/booking/test",
+            "route": "/booking/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.022,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/cancel-booking/test",
+            "route": "/cancel-booking/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/payment/test",
+            "route": "/payment/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.009,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/login",
+            "route": "/admin/login",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.044,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/logout",
+            "route": "/admin/logout",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.019,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin",
+            "route": "/admin",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.038,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/calendar",
+            "route": "/admin/calendar",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.032,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/users",
+            "route": "/admin/users",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.026,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/users/delete/test",
+            "route": "/admin/users/delete/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.007,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/grounds",
+            "route": "/admin/grounds",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.019,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/grounds/add",
+            "route": "/admin/grounds/add",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.035,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/grounds/edit/test",
+            "route": "/admin/grounds/edit/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.016,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/grounds/delete/test",
+            "route": "/admin/grounds/delete/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.014,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/bookings",
+            "route": "/admin/bookings",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 200,
+            "response_time_seconds": 0.022,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "PASS",
+            "error": null
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/bookings/test",
+            "route": "/admin/bookings/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.113,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/bookings/cancel/test",
+            "route": "/admin/bookings/cancel/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.008,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/payment/confirm/test",
+            "route": "/admin/payment/confirm/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.01,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/admin/payment/reject/test",
+            "route": "/admin/payment/reject/test",
+            "source_type": "Flask",
+            "source_file": "app.py",
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.011,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/api",
+            "route": "/api",
+            "source_type": "Common API candidate",
+            "source_file": null,
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.01,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/api/health",
+            "route": "/api/health",
+            "source_type": "Common API candidate",
+            "source_file": null,
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.007,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/api/status",
+            "route": "/api/status",
+            "source_type": "Common API candidate",
+            "source_file": null,
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.014,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/health",
+            "route": "/health",
+            "source_type": "Common API candidate",
+            "source_file": null,
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.009,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        },
+        {
+            "url": "http://127.0.0.1:5000/healthcheck",
+            "route": "/healthcheck",
+            "source_type": "Common API candidate",
+            "source_file": null,
+            "method": "GET",
+            "status_code": 404,
+            "response_time_seconds": 0.011,
+            "content_type": "text/html; charset=utf-8",
+            "is_json": false,
+            "json_valid": null,
+            "status": "FAIL",
+            "error": "Route returned HTTP 404"
+        }
+    ]
+}

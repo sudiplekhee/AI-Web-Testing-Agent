@@ -1,0 +1,354 @@
+{
+    "agent": "AI Website Testing Agent",
+    "component": "Intelligent Error Mapper",
+    "mapping_time": "2026-10-01T23:16:05.082185",
+    "errors_analyzed": 21,
+    "mappings": [
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/uploads/test",
+            "route": "/uploads/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/esewa/pay/test",
+            "route": "/esewa/pay/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/ground/test",
+            "route": "/ground/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/available-slots/test",
+            "route": "/available-slots/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/book/test",
+            "route": "/book/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/booking-success/test",
+            "route": "/booking-success/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/booking/test",
+            "route": "/booking/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/cancel-booking/test",
+            "route": "/cancel-booking/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/payment/test",
+            "route": "/payment/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/users/delete/test",
+            "route": "/admin/users/delete/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/grounds/edit/test",
+            "route": "/admin/grounds/edit/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/grounds/delete/test",
+            "route": "/admin/grounds/delete/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/bookings/test",
+            "route": "/admin/bookings/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/bookings/cancel/test",
+            "route": "/admin/bookings/cancel/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/payment/confirm/test",
+            "route": "/admin/payment/confirm/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/admin/payment/reject/test",
+            "route": "/admin/payment/reject/test",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": "app.py",
+            "best_source": {
+                "file": "app.py",
+                "line": null,
+                "code": null,
+                "context": [],
+                "match_type": "API source file",
+                "confidence": 95,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/api",
+            "route": "/api",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": null,
+            "best_source": {
+                "file": null,
+                "line": 1678,
+                "code": "    # Verify status API product code",
+                "context": [
+                    {
+                        "line": 1676,
+                        "code": ""
+                    },
+                    {
+                        "line": 1677,
+                        "code": "    # --------------------------------------------------------"
+                    },
+                    {
+                        "line": 1678,
+                        "code": "    # Verify status API product code"
+                    },
+                    {
+                        "line": 1679,
+                        "code": "    # --------------------------------------------------------"
+                    },
+                    {
+                        "line": 1680,
+                        "code": ""
+                    }
+                ],
+                "match_type": "route search",
+                "confidence": 75,
+                "reason": "API test identified a source file or route associated with this endpoint."
+            }
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/api/health",
+            "route": "/api/health",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": null,
+            "best_source": null
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/api/status",
+            "route": "/api/status",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": null,
+            "best_source": null
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/health",
+            "route": "/health",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": null,
+            "best_source": null
+        },
+        {
+            "error_type": "API Error",
+            "resource_url": "http://127.0.0.1:5000/healthcheck",
+            "route": "/healthcheck",
+            "details": "Route returned HTTP 404",
+            "status_code": 404,
+            "source_file": null,
+            "best_source": null
+        }
+    ]
+}

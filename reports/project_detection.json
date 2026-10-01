@@ -1,0 +1,39 @@
+{
+    "agent": "AI Website Testing Agent",
+    "detector": "Project Detector",
+    "detection_time": "2026-10-01T23:15:24.195150",
+    "project_directory": "C:\\Users\\SUDIP\\OneDrive\\Desktop\\futsal website",
+    "project_type": "Flask",
+    "frameworks_detected": [
+        "Flask"
+    ],
+    "languages_detected": [
+        "Python"
+    ],
+    "server_command": "python app.py",
+    "confidence": 99,
+    "files_discovered": 29,
+    "detection_evidence": [
+        {
+            "framework": "Flask",
+            "score": 110,
+            "evidence": [
+                "app.py: from flask import",
+                "app.py: Flask application instance",
+                "app.py: @app.route"
+            ]
+        },
+        {
+            "framework": "Streamlit",
+            "score": 20,
+            "evidence": [
+                "app.py: Streamlit API usage"
+            ]
+        }
+    ],
+    "static_files": {
+        "html": 24,
+        "css": 1,
+        "javascript": 0
+    }
+}
